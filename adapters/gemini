@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+command -v gemini >/dev/null 2>&1 || {
+  echo "Gemini CLI is not available inside the sandbox." >&2
+  echo "The existing FnNAS Docker launcher is intentionally not exposed through /vol1 or Docker sockets." >&2
+  exit 127
+}
+exec gemini "$@"
