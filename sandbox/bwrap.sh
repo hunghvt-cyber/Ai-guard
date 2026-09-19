@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKSPACE=""; NETWORK=none; POLICY=""; DEBUG=0
+WORKSPACE=""; REQUESTED_NETWORK=none; POLICY=""; DEBUG=0
 while [[ $# -gt 0 ]]; do
  case "$1" in
   --workspace) WORKSPACE="$2"; shift 2;;
-  --network) NETWORK="$2"; shift 2;;
+  --network) REQUESTED_NETWORK="$2"; shift 2;;
   --policy) POLICY="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
   --) shift; break;;
@@ -40,7 +40,7 @@ B+=(
 [[ "$PID_NAMESPACE" == 1 ]] && B+=(--unshare-pid)
 [[ "$IPC_NAMESPACE" == 1 ]] && B+=(--unshare-ipc)
 [[ "$UTS_NAMESPACE" == 1 ]] && B+=(--unshare-uts)
-[[ "$NETWORK" == none ]] && B+=(--unshare-net)
+[[ "$REQUESTED_NETWORK" == none ]] && B+=(--unshare-net)
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
 
 B+=(
