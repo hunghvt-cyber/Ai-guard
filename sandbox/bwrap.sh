@@ -41,6 +41,7 @@ B+=(
 [[ "$IPC_NAMESPACE" == 1 ]] && B+=(--unshare-ipc)
 [[ "$UTS_NAMESPACE" == 1 ]] && B+=(--unshare-uts)
 [[ "$REQUESTED_NETWORK" == none ]] && B+=(--unshare-net)
+[[ 1 == 1 ]] && B+=(--unshare-user)
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
 
 B+=(
