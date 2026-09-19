@@ -38,6 +38,7 @@ case "$POLICY" in
 esac
 
 # Never let the writable workspace overlap the Guard installation.
+case "$BASE" in "$WORKSPACE"|"$WORKSPACE"/*) echo "Guard installation is inside the workspace" >&2; exit 2;; esac
 case "$WORKSPACE" in
  "$BASE"|"$BASE"/*)
  echo "workspace overlaps the Guard installation" >&2
