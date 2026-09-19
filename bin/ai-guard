@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+WORKSPACE=$PWD
+NETWORK=none
+POLICY="$BASE/policy/default.conf"
+DEBUG=0
+
+usage() {
+  echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--debug] -- COMMAND [ARGS...]"
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2 ;;
+    --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2 ;;
+    --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2 ;;
+    --debug) DEBUG=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[ "$#" -gt 0 ] || { echo "no command supplied" >&2; exit 2; }
+[ -d "$WORKSPACE" ] || { echo "workspace is not a directory: $WORKSPACE" >&2; exit 2; }
+[ -f "$POLICY" ] || { echo "policy not found: $POLICY" >&2; exit 2; }
+case "$NETWORK" in none|host) ;; *) echo "invalid network mode" >&2; exit 2 ;; esac
+command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
+
+exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --debug "$DEBUG" -- "$@"
