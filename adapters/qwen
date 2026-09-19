@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+command -v qwen >/dev/null 2>&1 || {
+  echo "Qwen Code CLI is not available inside the sandbox." >&2
+  echo "The Guard does not install agents." >&2
+  exit 127
+}
+exec qwen "$@"
