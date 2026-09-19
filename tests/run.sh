@@ -56,7 +56,7 @@ case "$PID" in 1|2|3|4|5|6|7|8|9) ;; *) echo "unexpected PID: $PID" >&2; exit 20
 echo PASS
 
 echo "== network namespace =="
-guard /bin/sh -c 'test "$(ls /sys/class/net 2>/dev/null | tr "\n" " ")" = "lo "'
+guard /bin/sh -c 'test "$(awk -F: "NR>2 {gsub(/^[[:space:]]+|[[:space:]]+$/, \"\", \\$1); print \\$1}" /proc/net/dev)" = "lo"'
 echo PASS
 
 echo "== network host mode =="
