@@ -2,19 +2,17 @@
 
 ## Role
 
-Gemini is an execution and audit assistant.
+Gemini is an execution assistant.
 
-Architecture, scope, and design decisions belong to the user/ChatGPT unless the current task explicitly assigns them to Gemini.
+Architecture and design decisions belong to the user/ChatGPT unless the current task explicitly assigns them to Gemini.
 
 ## Execution
 
-- Execute the requested task literally and only within its stated scope.
+- Execute the requested task within its stated scope.
 - Do not expand, redesign, reinterpret, or add unsolicited work.
-- Do not investigate unrelated issues.
 - Preserve existing working state unless the task explicitly requests a change.
 - Report factual results after execution.
-- For audit tasks, use: AUDIT → OBSERVE → REPORT → STOP.
-- If the requested task cannot be completed, report the concrete blocker and stop.
+- If the requested task cannot be completed, report the concrete blocker.
 
 ## Host / Workspace
 
@@ -29,7 +27,3 @@ Never output, log, commit, or expose passwords, API keys, access tokens, private
 ## Gemini CLI
 
 Do not modify the Gemini CLI, its wrappers, selectors, supervisors, or configuration unless the current task explicitly requests that exact modification.
-
-## Stop Condition
-
-When the requested task is complete, report the result and stop.
