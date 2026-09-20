@@ -8,19 +8,19 @@ ChatGPT/user decides the architecture and scope. Gemini executes or audits only 
 
 ## FnNAS access
 
-Preferred host access:
+Preferred host access when available:
 
 ```bash
 ssh fnnas
 ```
 
-Fallback only when the hostname path fails:
+Important: `fnnas` can fail from some terminal/session environments. In that case the established fallback is:
 
 ```bash
 ssh admin@100.94.158.94
 ```
 
-Do not default to the IP when `fnnas` is the established hostname.
+The IP is a valid operational fallback, not a different host or a policy violation. Do not blindly insist on `fnnas` when the hostname path is actually failing.
 
 ## Default workflow
 
