@@ -54,15 +54,31 @@ The policy file must remain inside the Guard installation because it is sourced 
 
 ## Network
 
-Network access is currently **disabled as an enforcement feature**. The CLI rejects `--network host`; the policy also requires `NETWORK=none`.
+Network access is **disabled by default and remains the security boundary**. The CLI rejects `--network host`; the policy requires `NETWORK=none`.
 
-An egress-controlled mode may be added later, but it must not use host networking as a security boundary.
+A narrow GitHub SSH capability is available without sharing the sandbox network:
+
+- host-side relay has a fixed destination: `github.com:22`
+- sandbox reaches the relay only through a private Unix socket
+- GitHub SSH config and known-hosts are injected read-only
+- GitHub authentication and `git ls-remote` have been validated
+- arbitrary destinations such as `google.com` remain unreachable
+
+This capability is not a general proxy and does not provide host networking.
+
+## Hardening decision
+
+Landlock is intentionally out of scope.
+
+Seccomp was evaluated as defense-in-depth and intentionally deferred because the current Bubblewrap boundary already provides the required isolation without introducing a large syscall allowlist maintenance burden.
+
+Do not add another hardening mechanism without a concrete requirement and a minimal POC proving its value.
 
 ## Gemini integration status
 
-The current FnNAS Gemini launcher is a Docker/Compose launcher under `/vol1/Docker/gemini`. The existing Gemini adapter intentionally does not expose `/vol1` or Docker sockets.
+The Guard repository now contains the generic enforcement boundary and Gemini operating notes/rules. Full replacement of the existing FnNAS Gemini launcher is a separate integration task and must not be implied by the generic Guard tests.
 
-Therefore this repository currently provides a hardened generic sandbox, but it does **not yet enforce the existing FnNAS Gemini Docker launcher**. A future Gemini backend must place the Docker boundary behind Guard without granting the agent Docker-socket control.
+The security boundary is AI Guard enforcement, not `GEMINI.md` or other Markdown instructions.
 
 ## Usage
 
