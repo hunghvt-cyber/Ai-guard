@@ -8,7 +8,7 @@ NETWORK=none
 POLICY="$BASE/policy/default.conf"
 DEBUG=0
 
-usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
+usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
 
 while [ "$#" -gt 0 ]; do
  case "$1" in
@@ -30,30 +30,29 @@ done
 WORKSPACE=$(readlink -f "$WORKSPACE")
 POLICY=$(readlink -f "$POLICY")
 
-# The policy is sourced before entering the sandbox, so only trusted policy
-# files shipped under the Guard installation are accepted.
 case "$POLICY" in
  "$BASE"/*) ;;
  *) echo "policy must be inside the Guard installation" >&2; exit 2;;
 esac
 
-# Never let the writable workspace overlap the Guard installation.
 case "$WORKSPACE" in
  "$BASE"|"$BASE"/*)
- echo "workspace overlaps the Guard installation" >&2
- exit 2
- ;;
+  echo "workspace overlaps the Guard installation" >&2
+  exit 2
+  ;;
 esac
 
-# Refuse obvious host-control / sensitive filesystem roots as workspaces.
 case "$WORKSPACE" in
  /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
- echo "workspace is a protected host path: $WORKSPACE" >&2
- exit 2
- ;;
+  echo "workspace is a protected host path: $WORKSPACE" >&2
+  exit 2
+  ;;
 esac
 
-case "$NETWORK" in none|host) ;; *) echo "invalid network mode" >&2; exit 2;; esac
+# The enforcement boundary is deny-by-default for networking.
+# Host networking is deliberately not an accepted Guard mode.
+[ "$NETWORK" = none ] || { echo "network mode is disabled; only 'none' is permitted" >&2; exit 2; }
+
 command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
 
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --debug "$DEBUG" -- "$@"
+exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network none --policy "$POLICY" --debug "$DEBUG" -- "$@"
