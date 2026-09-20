@@ -5,15 +5,17 @@ BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BASE=$(readlink -f "$BASE")
 WORKSPACE=$PWD
 NETWORK=none
+CAPABILITY=none
 POLICY="$BASE/policy/default.conf"
 DEBUG=0
 
-usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
+usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none] [--capability none|github-ssh] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
 
 while [ "$#" -gt 0 ]; do
  case "$1" in
   --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
   --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
+  --capability) [ "$#" -ge 2 ] || exit 2; CAPABILITY=$2; shift 2;;
   --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2;;
   --debug) DEBUG=1; shift;;
   -h|--help) usage; exit 0;;
@@ -52,7 +54,8 @@ esac
 # The enforcement boundary is deny-by-default for networking.
 # Host networking is deliberately not an accepted Guard mode.
 [ "$NETWORK" = none ] || { echo "network mode is disabled; only 'none' is permitted" >&2; exit 2; }
+[ "$CAPABILITY" = none ] || [ "$CAPABILITY" = github-ssh ] || { echo "unsupported capability: $CAPABILITY" >&2; exit 2; }
 
 command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
 
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network none --policy "$POLICY" --debug "$DEBUG" -- "$@"
+exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network none --capability "$CAPABILITY" --policy "$POLICY" --debug "$DEBUG" -- "$@"
