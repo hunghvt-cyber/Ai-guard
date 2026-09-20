@@ -26,6 +26,10 @@ echo "== policy guard =="
 if "$BASE/bin/ai-guard" --workspace "$W" --policy "$W/input" -- /bin/true 2>/dev/null; then exit 15; fi
 echo PASS
 
+echo "== network deny-by-default =="
+if "$BASE/bin/ai-guard" --workspace "$W" --network host -- /bin/true 2>/dev/null; then exit 17; fi
+echo PASS
+
 echo "== root guard =="
 if [ "$(id -u)" -eq 0 ]; then
   echo "SKIP (already root)"
@@ -40,6 +44,10 @@ fi
 
 echo "== home =="
 guard /bin/sh -c 'test -d "$HOME"; test ! -e "$HOME/../admin/.ssh"; touch "$HOME/home-write"; test -f "$HOME/home-write"'
+echo PASS
+
+echo "== host /etc isolation =="
+guard /bin/sh -c '! test -e /etc/shadow; ! test -e /etc/sudoers; test -f /etc/passwd; test -f /etc/group'
 echo PASS
 
 echo "== docker sockets =="
@@ -59,11 +67,8 @@ echo "== network namespace =="
 guard /bin/sh -c 'grep -q "^[[:space:]]*lo:" /proc/net/dev; test "$(grep -Ec "^[[:space:]]*[^[:space:]]+:" /proc/net/dev)" = 1'
 echo PASS
 
-echo "== network host mode =="
-HOST_NET_OUTPUT=$("$BASE/bin/ai-guard" --workspace "$W" --network host --debug -- /bin/true 2>&1)
-case "$HOST_NET_OUTPUT" in
-  *--unshare-net*) echo "host mode unexpectedly requested --unshare-net" >&2; exit 21;;
-esac
+echo "== user namespace hardening =="
+guard /bin/sh -c 'grep -q "^NSpid:" /proc/self/status; ! unshare -Ur true 2>/dev/null'
 echo PASS
 
 echo "== symlink escape =="
