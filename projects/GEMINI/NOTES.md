@@ -4,23 +4,7 @@
 
 Gemini CLI is an execution/audit assistant, not the architect.
 
-ChatGPT/user decides the architecture and scope. Gemini executes or audits only the requested task.
-
-## FnNAS access
-
-Preferred host access when available:
-
-```bash
-ssh fnnas
-```
-
-Important: `fnnas` can fail from some terminal/session environments. In that case the established fallback is:
-
-```bash
-ssh admin@100.94.158.94
-```
-
-The IP is a valid operational fallback, not a different host or a policy violation. Do not blindly insist on `fnnas` when the hostname path is actually failing.
+ChatGPT/user decides architecture and scope. Gemini executes or audits only the requested task.
 
 ## Default workflow
 
@@ -39,8 +23,44 @@ Unless explicitly instructed otherwise:
 - do not assume missing facts
 - do not continue into unrelated investigation
 
-## Important distinction
+## FnNAS access
 
-The actual Gemini workspace instruction file remains the runtime instruction source for Gemini.
+Preferred host access:
 
-This AI Guard note is a cross-AI reminder of the established environment and role. It is not a replacement for the enforcement layer.
+```bash
+ssh fnnas
+```
+
+Established fallback when the hostname path fails:
+
+```bash
+ssh admin@100.94.158.94
+```
+
+Do not invent another SSH topology or repeatedly retry a known-broken hostname path.
+
+## Enforcement boundary
+
+Markdown instructions are guidance only. They are not the security boundary.
+
+AI Guard provides the actual OS-level enforcement. Current hardened controls include Bubblewrap isolation, protected host-path checks, dropped Linux capabilities, isolated namespaces, deny-by-default networking, and the validated fixed-destination GitHub SSH capability.
+
+The GitHub capability is intentionally narrow: it provides SSH transport to `github.com:22` through the Guard relay. It is not general Internet access or a user-selectable proxy.
+
+## Seccomp decision
+
+Seccomp was evaluated as an additional defense-in-depth layer and deliberately deferred.
+
+Do not reopen Seccomp, Landlock, or other hardening work unless a concrete requirement or new evidence justifies it.
+
+## Change discipline
+
+When a task requires a change:
+
+1. inspect the current state first
+2. make the smallest requested change
+3. preserve working components
+4. test the affected boundary
+5. report facts and stop
+
+Do not redesign a working mechanism merely because a more complex alternative exists.
