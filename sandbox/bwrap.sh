@@ -135,6 +135,7 @@ if [[ "$CAPABILITY" == github-ssh ]]; then
     --ro-bind "$RELAY_DIR/proxy.py" /home/sandbox/proxy.py
     --ro-bind "$GITHUB_KEY" /home/sandbox/github_key
     --bind "$SOCK" /home/sandbox/github.sock
+    --setenv GIT_SSH_COMMAND "/usr/bin/ssh -F /home/sandbox/.ssh/config"
   )
 fi
 
