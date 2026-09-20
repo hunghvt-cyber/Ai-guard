@@ -18,24 +18,29 @@ Gemini / Qwen / future agent
 
 AI Guard is agent-agnostic: adapters select the CLI, while the Guard owns the OS-level boundary.
 
-## Security defaults
+## Security baseline
+
+The default Guard is deny-by-default:
 
 - only the supplied workspace is writable on the host
 - the workspace cannot overlap the Guard installation or protected host roots
-- `/home`, `/root`, and `/tmp` are sandbox-local
+- `/home` and `/root` are sandbox-local
+- `/etc` is sandbox-local with only minimal identity files exposed
 - `/vol1` is not mounted
 - Docker/containerd sockets are not mounted
 - SSH credentials are not mounted
 - PID, IPC and UTS namespaces are isolated
+- a user namespace is explicitly created
+- nested user namespaces are disabled inside the sandbox
 - all Linux capabilities are dropped inside the sandbox
 - a new session is created for the sandbox process
-- network is isolated by default
+- network is isolated by default and is currently the only accepted mode
 - sandbox dies with its parent
 - environment is cleared except for a minimal safe runtime
 - no Docker socket or host-control interface is intentionally exposed
 - Guard refuses to run as UID 0
 
-Bubblewrap creates a separate mount namespace and provides the namespace controls used here.
+Bubblewrap provides the namespace and filesystem primitives; the Guard scripts define the actual policy.
 
 ## Workspace boundary
 
@@ -45,21 +50,19 @@ The writable workspace is deliberately treated as untrusted data. Before Bubblew
 - `/`, `/root`, `/home`, `/etc`, `/usr`, `/var`, `/vol1`
 - `/proc`, `/sys`, and `/dev`
 
-The default policy file must remain inside the Guard installation because it is sourced by the host-side launcher before entering the sandbox.
+The policy file must remain inside the Guard installation because it is sourced by the host-side launcher before entering the sandbox.
 
-## Network modes
+## Network
 
-`--network none` is the default and uses a separate network namespace.
+Network access is currently **disabled as an enforcement feature**. The CLI rejects `--network host`; the policy also requires `NETWORK=none`.
 
-`--network host` intentionally disables network namespace isolation. It gives the sandbox access to the host network namespace, including interfaces and services reachable through that namespace. It is **not** an outbound-only mode and should not be treated as a security boundary.
+An egress-controlled mode may be added later, but it must not use host networking as a security boundary.
 
-An egress-only mode using slirp4netns/pasta or an allowlisted proxy is a later hardening task.
+## Gemini integration status
 
-## Current Gemini limitation
+The current FnNAS Gemini launcher is a Docker/Compose launcher under `/vol1/Docker/gemini`. The existing Gemini adapter intentionally does not expose `/vol1` or Docker sockets.
 
-The existing FnNAS Gemini launcher is a Docker/Compose launcher under `/vol1/Docker/gemini`. Safely wrapping that launcher cannot mean exposing all of `/vol1` or the Docker socket, because that would defeat the Guard boundary.
-
-Therefore the Gemini adapter in this first version deliberately refuses to weaken the sandbox. A later Gemini backend can invoke the required container boundary from the Guard side.
+Therefore this repository currently provides a hardened generic sandbox, but it does **not yet enforce the existing FnNAS Gemini Docker launcher**. A future Gemini backend must place the Docker boundary behind Guard without granting the agent Docker-socket control.
 
 ## Usage
 
@@ -67,15 +70,7 @@ Therefore the Gemini adapter in this first version deliberately refuses to weake
 ./bin/ai-guard --workspace "$PWD" -- /bin/sh
 ```
 
-Network-disabled is the default.
-
-For diagnostics only, an agent may be run with the host network namespace:
-
-```bash
-./bin/ai-guard --network host --workspace "$PWD" -- qwen
-```
-
-This mode is intentionally not network-isolated.
+Network-disabled is the only supported mode.
 
 Run the isolation tests:
 
@@ -83,7 +78,7 @@ Run the isolation tests:
 ./tests/run.sh
 ```
 
-This is an early security prototype. It is not considered production-ready until the test suite and independent security review pass.
+This remains a security prototype. It should not be treated as production-ready until the test suite passes on the actual FnNAS host and the Gemini integration is independently validated.
 
 ## Layout
 
@@ -96,16 +91,6 @@ policy/default.conf
 tests/run.sh
 ```
 
-## Existing work
-
-The design was cross-checked against existing Bubblewrap agent wrappers such as `bubblewrap-ai` and `ai-bwrap`.
-
-Qwen Code currently documents Docker/Podman sandboxing on Linux; native Bubblewrap support is being discussed upstream, so this project keeps Qwen as an adapter and owns the Linux boundary externally.
-
-## Status
-
-Security-hardening prototype committed for FnNAS testing. The real FnNAS test remains pending; no kernel changes are required by this repository.
-
 ## AI Context
 
 AI Guard also provides a lightweight external-memory and project-context layer for AI assistants.
@@ -115,23 +100,18 @@ NOTES.md
 projects/
   NAS/
     NOTES.md
-    RULES.md        # when this project has explicit AI rules
   GEMINI/
     NOTES.md
-    RULES.md        # when this project has explicit AI rules
+    runtime/       # approved runtime templates
   TAPO-NAS/
     NOTES.md
-    RULES.md        # when this project has explicit AI rules
 ```
 
 Principles:
 
-- project-specific AI rules and reminders live under the corresponding `projects/<PROJECT>/` directory
-- `NOTES.md` contains stable facts and lessons; `RULES.md` contains explicit instructions
+- project-specific AI reminders live under the corresponding `projects/<PROJECT>/` directory
+- `NOTES.md` contains stable facts and lessons
 - do not duplicate the same rule in multiple project files
 - project repositories remain the source of truth for code, tests, architecture, and detailed handoff documents
 - project repositories may contain a short `AI-GUARD.md` pointer to their applicable AI Guard context
-- AI Guard does not automatically absorb every project document
-- enforcement policy/code remains separate from project context
-
-The current FnNAS access note is under `projects/NAS/NOTES.md`. The Gemini role/workflow note is under `projects/GEMINI/NOTES.md`.
+- enforcement code remains separate from project context
