@@ -105,3 +105,25 @@ Qwen Code currently documents Docker/Podman sandboxing on Linux; native Bubblewr
 ## Status
 
 Security-hardening prototype committed for FnNAS testing. The real FnNAS test remains pending; no kernel changes are required by this repository.
+
+## AI Notes
+
+AI Guard also contains a small external-memory layer for facts that AI assistants commonly forget.
+
+```text
+NOTES.md
+projects/
+  NAS.md
+  GEMINI.md
+  TAPO-NAS.md
+```
+
+These files are intentionally lightweight:
+
+- They record stable environment facts, project state, and lessons learned from previous work.
+- They are not copies of project documentation.
+- Project repositories remain the source of truth for code, tests, architecture, and detailed handoff documents.
+- Enforcement policy remains separate from notes.
+- When a repeated AI mistake is discovered, add a concise note here instead of relying on conversation memory.
+
+For FnNAS, the canonical AI access identity is `fnnas` and the preferred SSH path is `ssh fnnas`. The Tailscale IP is a fallback when hostname resolution fails.
