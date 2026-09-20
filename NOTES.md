@@ -19,3 +19,20 @@ Use `NOTES.md` for stable facts and lessons. Use `RULES.md` only when a project 
 - Runtime/workspace files on FnNAS: deployed copies of applicable instructions, when needed.
 
 Avoid duplicating the same rule across projects.
+
+## Enforcement status
+
+The current hardened baseline uses Bubblewrap with filesystem and namespace isolation, dropped capabilities, deny-by-default networking, and protected host-path checks.
+
+A fixed-destination GitHub SSH capability is implemented and validated:
+
+- sandbox network remains isolated
+- host relay accepts only `github.com:22`
+- transport crosses a private Unix socket
+- GitHub SSH authentication works
+- `git ls-remote` works through the capability
+- arbitrary external destinations such as `google.com` remain unreachable
+
+Seccomp was considered and deliberately deferred. The current design does not depend on Seccomp.
+
+The security boundary is the Guard enforcement layer, not Markdown instructions.
