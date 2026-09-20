@@ -1,22 +1,21 @@
-# AI Notes
+# AI Guard Notes
 
-This directory is the external memory/context layer for AI work on FnNAS and its projects.
+This is the top-level index for the lightweight external-memory layer.
 
-The goal is simple: record facts that AI assistants commonly forget or misinterpret. This is not a copy of project documentation and is not intended to become a second project-management system.
+## Project context
 
-## Rules for using these notes
+Project-specific AI context is kept under:
 
-- Treat these notes as the preferred source for the environment facts recorded here.
-- Do not invent missing infrastructure details.
-- If reality conflicts with a note, verify the host/project and then update the note.
-- Keep notes short and practical.
-- Project-specific implementation details remain in the project repository.
-- AI Guard enforcement/policy remains separate from these notes.
+- `projects/NAS/`
+- `projects/GEMINI/`
+- `projects/TAPO-NAS/`
 
-## Current AI roles
+Use `NOTES.md` for stable facts and lessons. Use `RULES.md` only when a project has explicit AI instructions.
 
-- ChatGPT: analysis, architecture, decisions and task instructions.
-- Gemini CLI: execution/audit assistant.
-- Gemini is not the architect.
-- Default Gemini workflow: AUDIT -> OBSERVE -> REPORT -> STOP.
-- Do not expand scope, make assumptions, modify/install/restart/delete/repair unless explicitly requested and permitted.
+## Ownership
+
+- AI Guard: shared AI context and enforcement.
+- Project repositories: source of truth for code, tests, architecture, and detailed handoff.
+- Runtime/workspace files on FnNAS: deployed copies of applicable instructions, when needed.
+
+Avoid duplicating the same rule across projects.
