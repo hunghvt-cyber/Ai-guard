@@ -106,24 +106,32 @@ Qwen Code currently documents Docker/Podman sandboxing on Linux; native Bubblewr
 
 Security-hardening prototype committed for FnNAS testing. The real FnNAS test remains pending; no kernel changes are required by this repository.
 
-## AI Notes
+## AI Context
 
-AI Guard also contains a small external-memory layer for facts that AI assistants commonly forget.
+AI Guard also provides a lightweight external-memory and project-context layer for AI assistants.
 
-```text
+```
 NOTES.md
 projects/
-  NAS.md
-  GEMINI.md
-  TAPO-NAS.md
+  NAS/
+    NOTES.md
+    RULES.md        # when this project has explicit AI rules
+  GEMINI/
+    NOTES.md
+    RULES.md        # when this project has explicit AI rules
+  TAPO-NAS/
+    NOTES.md
+    RULES.md        # when this project has explicit AI rules
 ```
 
-These files are intentionally lightweight:
+Principles:
 
-- They record stable environment facts, project state, and lessons learned from previous work.
-- They are not copies of project documentation.
-- Project repositories remain the source of truth for code, tests, architecture, and detailed handoff documents.
-- Enforcement policy remains separate from notes.
-- When a repeated AI mistake is discovered, add a concise note here instead of relying on conversation memory.
+- project-specific AI rules and reminders live under the corresponding `projects/<PROJECT>/` directory
+- `NOTES.md` contains stable facts and lessons; `RULES.md` contains explicit instructions
+- do not duplicate the same rule in multiple project files
+- project repositories remain the source of truth for code, tests, architecture, and detailed handoff documents
+- project repositories may contain a short `AI-GUARD.md` pointer to their applicable AI Guard context
+- AI Guard does not automatically absorb every project document
+- enforcement policy/code remains separate from project context
 
-For FnNAS, the canonical AI access identity is `fnnas` and the preferred SSH path is `ssh fnnas`. The Tailscale IP is a fallback when hostname resolution fails.
+The current FnNAS access note is under `projects/NAS/NOTES.md`. The Gemini role/workflow note is under `projects/GEMINI/NOTES.md`.
