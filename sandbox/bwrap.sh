@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKSPACE=""; REQUESTED_NETWORK=none; POLICY=""; DEBUG=0
+WORKSPACE=""; REQUESTED_NETWORK=none; CAPABILITY=none; POLICY=""; DEBUG=0
 while [[ $# -gt 0 ]]; do
  case "$1" in
   --workspace) WORKSPACE="$2"; shift 2;;
   --network) REQUESTED_NETWORK="$2"; shift 2;;
+  --capability) CAPABILITY="$2"; shift 2;;
   --policy) POLICY="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
   --) shift; break;;
@@ -18,6 +19,7 @@ source "$POLICY"
 [[ "$WORKSPACE_MODE" == rw ]] || { echo "WORKSPACE_MODE must be rw" >&2; exit 2; }
 [[ "$EXPOSE_SSH" == 0 && "$EXPOSE_DOCKER" == 0 && "$EXPOSE_VOL1" == 0 ]] || { echo "sensitive-path exposure is disabled" >&2; exit 2; }
 [[ "$REQUESTED_NETWORK" == none && "$NETWORK" == none ]] || { echo "network mode is disabled by policy" >&2; exit 2; }
+[[ "$CAPABILITY" == none || "$CAPABILITY" == github-ssh ]] || { echo "unsupported capability: $CAPABILITY" >&2; exit 2; }
 
 B=(bwrap
    --unshare-user
