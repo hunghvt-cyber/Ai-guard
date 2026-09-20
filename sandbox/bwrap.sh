@@ -17,14 +17,24 @@ done
 source "$POLICY"
 [[ "$WORKSPACE_MODE" == rw ]] || { echo "WORKSPACE_MODE must be rw" >&2; exit 2; }
 [[ "$EXPOSE_SSH" == 0 && "$EXPOSE_DOCKER" == 0 && "$EXPOSE_VOL1" == 0 ]] || { echo "sensitive-path exposure is disabled" >&2; exit 2; }
+[[ "$REQUESTED_NETWORK" == none && "$NETWORK" == none ]] || { echo "network mode is disabled by policy" >&2; exit 2; }
 
 B=(bwrap
+   --unshare-user
+   --disable-userns
    --ro-bind /usr /usr
    --ro-bind /bin /bin)
 [[ -d /lib ]] && B+=(--ro-bind /lib /lib)
 [[ -d /lib64 ]] && B+=(--ro-bind /lib64 /lib64)
+
+# Do not expose the host /etc wholesale. Keep only non-sensitive identity
+# files needed by common CLI tools; network/DNS configuration is intentionally
+# absent because networking is disabled.
 B+=(
-  --ro-bind /etc /etc
+  --tmpfs /etc
+  --ro-bind /etc/passwd /etc/passwd
+  --ro-bind /etc/group /etc/group
+  --ro-bind /etc/nsswitch.conf /etc/nsswitch.conf
   --proc /proc
   --dev /dev
   --tmpfs /tmp
@@ -40,7 +50,6 @@ B+=(
 [[ "$PID_NAMESPACE" == 1 ]] && B+=(--unshare-pid)
 [[ "$IPC_NAMESPACE" == 1 ]] && B+=(--unshare-ipc)
 [[ "$UTS_NAMESPACE" == 1 ]] && B+=(--unshare-uts)
-[[ "$REQUESTED_NETWORK" == none ]] && B+=(--unshare-net)
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
 
 B+=(
