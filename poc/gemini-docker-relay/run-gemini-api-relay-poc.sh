@@ -83,7 +83,7 @@ cd "$BASE"
 docker compose -f compose.yml -f "$OVERRIDE" config >/dev/null
 
 # Bridge 127.0.0.1:443 inside the container to the fixed Unix relay.
-docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps \
+docker compose -f compose.yml -f "$OVERRIDE" run --no-deps \
   --entrypoint /bin/sh \
   -d --name "$CONTAINER" \
   -e RELAY_SOCKET=/run/ai-guard/gemini-api.sock \
@@ -91,7 +91,7 @@ docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps \
   -c '/usr/local/bin/node /run/ai-guard/tcp-unix-proxy.js >/tmp/api-proxy.log 2>&1 & exec /usr/local/bin/node /run/ai-guard/tls-test.js'
 
 EXIT_CODE="$(docker wait "$CONTAINER")"
-LOGS="$(docker logs "$CONTAINER" 2>&1 || true)"
+LOGS="$(docker logs "$CONTAINER" 2>&1 | tr -d '\r' || true)"
 
 printf '%s\n' "$LOGS"
 
