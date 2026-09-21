@@ -40,6 +40,9 @@ done
 cat >"$OVERRIDE" <<EOF
 services:
   gemini:
+    entrypoint:
+      - /bin/sh
+      - -lc
     network_mode: none
     cap_drop:
       - ALL
@@ -56,8 +59,8 @@ cd "$BASE"
 docker compose -f compose.yml -f "$OVERRIDE" config >/dev/null
 
 echo "=== NETWORK DENY ==="
-if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps gemini \
-  /bin/sh -lc '/usr/local/bin/node -e "require("dns").lookup("github.com",e=>process.exit(e?0:1))"'; then
+NETWORK_TEST='/usr/local/bin/node -e '''require("dns").lookup("github.com",e=>process.exit(e?0:1))''''
+if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps gemini "$NETWORK_TEST"; then
   echo "NETWORK_DENY=FAIL"
   exit 1
 else
@@ -66,12 +69,10 @@ fi
 
 echo "=== GITHUB RELAY ==="
 RELAY_SOCKET=/run/ai-guard/github.sock
-PROXY="/usr/local/bin/node /run/ai-guard/unix-proxy.js"
-CMD="ssh -i /run/ai-guard/github_key -o BatchMode=yes -o ProxyCommand=\"$PROXY\" -o UserKnownHostsFile=/run/ai-guard/known_hosts -o StrictHostKeyChecking=yes git@github.com"
+CMD='ssh -i /run/ai-guard/github_key -o BatchMode=yes -o ProxyCommand="/usr/local/bin/node /run/ai-guard/unix-proxy.js" -o UserKnownHostsFile=/run/ai-guard/known_hosts -o StrictHostKeyChecking=yes git@github.com'
 
 if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps \
-  -e RELAY_SOCKET="$RELAY_SOCKET" gemini \
-  /bin/sh -lc "$CMD 2>&1 | grep -F 'Hi hunghvt-cyber!'"; then
+  -e RELAY_SOCKET="$RELAY_SOCKET" gemini "$CMD 2>&1 | grep -F 'Hi hunghvt-cyber!'"; then
   echo "GITHUB_RELAY=PASS"
 else
   echo "GITHUB_RELAY=FAIL"
