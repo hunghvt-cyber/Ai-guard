@@ -59,7 +59,7 @@ cd "$BASE"
 docker compose -f compose.yml -f "$OVERRIDE" config >/dev/null
 
 echo "=== NETWORK DENY ==="
-NETWORK_TEST="/usr/local/bin/node -e 'require(\"dns\").lookup(\"github.com\",e=>process.exit(e?0:1))'"
+NETWORK_TEST="/usr/local/bin/node -e 'const net=require(\"net\");const s=net.createConnection({host:\"github.com\",port:22});s.setTimeout(3000);s.on(\"connect\",()=>process.exit(0));s.on(\"error\",()=>process.exit(1));s.on(\"timeout\",()=>process.exit(1))'"
 if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps gemini "$NETWORK_TEST"; then
   echo "NETWORK_DENY=FAIL"
   exit 1
