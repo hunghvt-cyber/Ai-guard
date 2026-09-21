@@ -27,7 +27,8 @@ chmod 700 "$RELAY"
 printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$KNOWN"
 chmod 600 "$KNOWN"
 
-RELAY_SOCKET="$SOCK" RELAY_DEST_HOST=github.com RELAY_DEST_PORT=22   /usr/bin/python3 "$RELAY" &
+RELAY_SOCKET="$SOCK" RELAY_DEST_HOST=github.com RELAY_DEST_PORT=22 \
+  /usr/bin/python3 "$RELAY" &
 RELAY_PID=$!
 
 for _ in $(seq 1 50); do
@@ -55,7 +56,8 @@ cd "$BASE"
 docker compose -f compose.yml -f "$OVERRIDE" config >/dev/null
 
 echo "=== NETWORK DENY ==="
-if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps gemini   /bin/sh -lc 'getent hosts github.com >/dev/null 2>&1'; then
+if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps gemini \
+  /bin/sh -lc '/usr/local/bin/node -e "require("dns").lookup("github.com",e=>process.exit(e?0:1))"'; then
   echo "NETWORK_DENY=FAIL"
   exit 1
 else
@@ -67,7 +69,9 @@ RELAY_SOCKET=/run/ai-guard/github.sock
 PROXY="/usr/local/bin/node /run/ai-guard/unix-proxy.js"
 CMD="ssh -i /run/ai-guard/github_key -o BatchMode=yes -o ProxyCommand=\"$PROXY\" -o UserKnownHostsFile=/run/ai-guard/known_hosts -o StrictHostKeyChecking=yes git@github.com"
 
-if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps   -e RELAY_SOCKET="$RELAY_SOCKET" gemini   /bin/sh -lc "$CMD 2>&1 | grep -F 'Hi hunghvt-cyber!'"; then
+if docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps \
+  -e RELAY_SOCKET="$RELAY_SOCKET" gemini \
+  /bin/sh -lc "$CMD 2>&1 | grep -F 'Hi hunghvt-cyber!'"; then
   echo "GITHUB_RELAY=PASS"
 else
   echo "GITHUB_RELAY=FAIL"
