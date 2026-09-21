@@ -51,3 +51,25 @@ Expected result:
     POC_PASS
 
 A failure means STOP and restore nothing yet; the existing Gemini runtime remains untouched.
+
+## FnNAS host SSH relay POC
+
+After the GitHub relay POC passes, test the same isolated container against the FnNAS host SSH service:
+
+    cd /vol1/Docker/Ai-guard
+    git pull --ff-only
+    ./poc/gemini-docker-relay/run-host-ssh-poc.sh
+
+The host relay is fixed to:
+
+    127.0.0.1:22
+
+The container still has network_mode: none; it receives only the Unix relay socket and the existing FnNAS SSH private key. The SSH host key is collected on the host side and pinned into a temporary known_hosts file.
+
+Expected result:
+
+    NETWORK_DENY=PASS
+    HOST_SSH_RELAY=PASS
+    POC_PASS
+
+This POC does not modify the production Gemini launcher.
