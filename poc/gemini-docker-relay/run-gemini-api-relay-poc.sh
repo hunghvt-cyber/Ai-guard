@@ -84,14 +84,21 @@ docker compose -f compose.yml -f "$OVERRIDE" config >/dev/null
 
 # Bridge 127.0.0.1:443 inside the container to the fixed Unix relay.
 docker compose -f compose.yml -f "$OVERRIDE" run --rm --no-deps \
+  --entrypoint /bin/sh \
   -d --name "$CONTAINER" \
   -e RELAY_SOCKET=/run/ai-guard/gemini-api.sock \
   gemini \
-  /bin/sh -lc '/usr/local/bin/node /run/ai-guard/tcp-unix-proxy.js >/tmp/api-proxy.log 2>&1 & exec /usr/local/bin/node /run/ai-guard/tls-test.js'
+  -c '/usr/local/bin/node /run/ai-guard/tcp-unix-proxy.js >/tmp/api-proxy.log 2>&1 & exec /usr/local/bin/node /run/ai-guard/tls-test.js'
 
-sleep 2
+EXIT_CODE="$(docker wait "$CONTAINER")"
 LOGS="$(docker logs "$CONTAINER" 2>&1 || true)"
+
 printf '%s\n' "$LOGS"
 
-grep -q '^GEMINI_API_TLS=PASS$' <<<"$LOGS"
-echo "=== GEMINI API RELAY POC PASS ==="
+if [[ "$EXIT_CODE" -eq 0 ]] && grep -q '^GEMINI_API_TLS=PASS$' <<<"$LOGS"; then
+  echo "=== GEMINI API RELAY POC PASS ==="
+else
+  echo "=== GEMINI API RELAY POC FAIL ==="
+  echo "Container exit code: $EXIT_CODE"
+  exit 1
+fi
