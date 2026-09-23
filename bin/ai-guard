@@ -7,14 +7,18 @@ WORKSPACE=$PWD
 NETWORK=none
 POLICY="$BASE/policy/default.conf"
 DEBUG=0
+OPENCODE=0
+SSH=0
 
-usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
+usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--opencode] [--ssh] [--debug] -- COMMAND [ARGS...]"; }
 
 while [ "$#" -gt 0 ]; do
  case "$1" in
   --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
   --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
   --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2;;
+  --opencode) OPENCODE=1; shift;;
+  --ssh) SSH=1; shift;;
   --debug) DEBUG=1; shift;;
   -h|--help) usage; exit 0;;
   --) shift; break;;
@@ -30,14 +34,12 @@ done
 WORKSPACE=$(readlink -f "$WORKSPACE")
 POLICY=$(readlink -f "$POLICY")
 
-# The policy is sourced before entering the sandbox, so only trusted policy
-# files shipped under the Guard installation are accepted.
 case "$POLICY" in
  "$BASE"/*) ;;
  *) echo "policy must be inside the Guard installation" >&2; exit 2;;
 esac
 
-# Never let the writable workspace overlap the Guard installation.
+case "$BASE" in "$WORKSPACE"|"$WORKSPACE"/*) echo "Guard installation is inside the workspace" >&2; exit 2;; esac
 case "$WORKSPACE" in
  "$BASE"|"$BASE"/*)
  echo "workspace overlaps the Guard installation" >&2
@@ -45,15 +47,20 @@ case "$WORKSPACE" in
  ;;
 esac
 
-# Refuse obvious host-control / sensitive filesystem roots as workspaces.
 case "$WORKSPACE" in
- /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
+ /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
  echo "workspace is a protected host path: $WORKSPACE" >&2
  exit 2
+ ;;
+ /vol1|/vol1/*)
+ case "$WORKSPACE" in
+   /vol1/Docker/*) ;;
+   *) echo "workspace outside controlled repo root: $WORKSPACE" >&2; exit 2;;
+ esac
  ;;
 esac
 
 case "$NETWORK" in none|host) ;; *) echo "invalid network mode" >&2; exit 2;; esac
 command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
 
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --debug "$DEBUG" -- "$@"
+exec "$BASE/sandbox/bwrap.sh"   --workspace "$WORKSPACE"   --network "$NETWORK"   --policy "$POLICY"   --opencode "$OPENCODE"   --ssh "$SSH"   --debug "$DEBUG"   -- "$@"
