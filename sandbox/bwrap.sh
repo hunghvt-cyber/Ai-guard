@@ -14,7 +14,7 @@ while [[ $# -gt 0 ]]; do
   --ssh) SSH="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
   --) shift; break;;
-  *) echo "unknown backend option: $1" >&2; exit 2;;
+  *) echo "unknown backend option: $1" >&2; exit 2 ;;
  esac
 done
 
@@ -30,6 +30,7 @@ B=(bwrap
 [[ -d /lib64 ]] && B+=(--ro-bind /lib64 /lib64)
 B+=(
   --ro-bind /etc /etc
+  --ro-bind /vol1 /vol1
   --proc /proc
   --dev /dev
   --tmpfs /tmp
@@ -41,6 +42,10 @@ B+=(
   --cap-drop ALL
   --new-session
 )
+
+if [[ "$WORKSPACE" == /vol1/* ]]; then
+  B+=(--bind "$WORKSPACE" "$WORKSPACE")
+fi
 
 [[ "$PID_NAMESPACE" == 1 ]] && B+=(--unshare-pid)
 [[ "$IPC_NAMESPACE" == 1 ]] && B+=(--unshare-ipc)
@@ -115,8 +120,15 @@ B+=(
   --setenv HOME /home/sandbox
   --setenv USER sandbox
   --setenv LOGNAME sandbox
-  --
 )
+
+# Explicit credential handoff: selector -> Guard -> sandbox.
+# Do not inherit the host environment wholesale.
+if [[ -n "${GOOGLE_GENERATIVE_AI_API_KEY:-}" ]]; then
+  B+=(--setenv GOOGLE_GENERATIVE_AI_API_KEY "$GOOGLE_GENERATIVE_AI_API_KEY")
+fi
+
+B+=(--)
 
 if [[ "$DEBUG" == 1 ]]; then
   printf '%q ' "${B[@]}" >&2
