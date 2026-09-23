@@ -1,0 +1,9 @@
+Host fnnas
+    HostName 100.94.158.94
+    User admin
+    IdentityFile /home/admin/.ssh/id_ed25519_gemini
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+    UserKnownHostsFile /home/admin/.ssh/known_hosts
+    ConnectTimeout 10
+    ServerAliveInterval 30

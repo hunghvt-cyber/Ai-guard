@@ -1,0 +1,79 @@
+#!/bin/bash
+set -euo pipefail
+
+SECRETS="/vol1/Docker/gemini/secrets/api-keys"
+STATE="/vol1/Docker/Ai-guard/state/opencode-key-last-used.txt"
+
+[[ -r "$SECRETS" ]] || {
+    echo "ERROR: key store not readable: $SECRETS" >&2
+    exit 1
+}
+
+mkdir -p "$(dirname "$STATE")"
+touch "$STATE"
+
+declare -A LAST_USED
+while IFS='|' read -r name timestamp; do
+    [[ -n "$name" ]] && LAST_USED["$name"]="$timestamp"
+done < "$STATE"
+
+KEYS=()
+declare -A KEY_VALUES
+
+while IFS= read -r line; do
+    [[ "$line" =~ ^(KEY[0-9]+)=(.*)$ ]] || continue
+    name="${BASH_REMATCH[1]}"
+    KEYS+=("$name")
+    KEY_VALUES["$name"]="${BASH_REMATCH[2]}"
+done < "$SECRETS"
+
+[[ "${#KEYS[@]}" -gt 0 ]] || {
+    echo "ERROR: no API keys found." >&2
+    exit 1
+}
+
+echo "OpenCode API Key"
+echo
+
+now=$(date +%s)
+
+for i in "${!KEYS[@]}"; do
+    name="${KEYS[$i]}"
+    ts="${LAST_USED[$name]:-}"
+    if [[ -z "$ts" ]]; then
+        status="[AVAILABLE]"
+        age="never used"
+    else
+        diff=$((now - ts))
+        (( diff < 0 )) && diff=0
+        h=$((diff / 3600))
+        m=$(((diff % 3600) / 60))
+        age="used ${h}h ${m}m ago"
+        (( diff >= 18000 )) && status="[AVAILABLE]" || status=""
+    fi
+    printf "%d. %-8s %-20s %s\n" "$((i+1))" "$name" "$age" "$status"
+done
+
+while true; do
+    read -r -p "Select key [1-${#KEYS[@]}]: " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] &&
+       (( choice >= 1 && choice <= ${#KEYS[@]} )); then
+        selected="${KEYS[$((choice-1))]}"
+        break
+    fi
+    echo "Invalid selection."
+done
+
+tmp="${STATE}.tmp.$$"
+{
+    while IFS='|' read -r name timestamp; do
+        [[ -n "$name" && "$name" != "$selected" ]] &&
+            printf '%s|%s\n' "$name" "$timestamp"
+    done < "$STATE"
+    printf '%s|%s\n' "$selected" "$now"
+} > "$tmp"
+mv "$tmp" "$STATE"
+
+export GOOGLE_GENERATIVE_AI_API_KEY="${KEY_VALUES[$selected]}"
+
+exec /vol1/Docker/Ai-guard/bin/ai-guard --workspace "$PWD" --network host --opencode --ssh -- /opencode/opencode "$@"
