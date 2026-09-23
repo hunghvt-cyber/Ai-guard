@@ -34,14 +34,11 @@ done
 WORKSPACE=$(readlink -f "$WORKSPACE")
 POLICY=$(readlink -f "$POLICY")
 
-# The policy is sourced before entering the sandbox, so only trusted policy
-# files shipped under the Guard installation are accepted.
 case "$POLICY" in
  "$BASE"/*) ;;
  *) echo "policy must be inside the Guard installation" >&2; exit 2;;
 esac
 
-# Never let the writable workspace overlap the Guard installation.
 case "$BASE" in "$WORKSPACE"|"$WORKSPACE"/*) echo "Guard installation is inside the workspace" >&2; exit 2;; esac
 case "$WORKSPACE" in
  "$BASE"|"$BASE"/*)
@@ -50,11 +47,16 @@ case "$WORKSPACE" in
  ;;
 esac
 
-# Refuse obvious host-control / sensitive filesystem roots as workspaces.
 case "$WORKSPACE" in
- /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
+ /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
  echo "workspace is a protected host path: $WORKSPACE" >&2
  exit 2
+ ;;
+ /vol1|/vol1/*)
+ case "$WORKSPACE" in
+   /vol1/Docker/*) ;;
+   *) echo "workspace outside controlled repo root: $WORKSPACE" >&2; exit 2;;
+ esac
  ;;
 esac
 

@@ -21,7 +21,7 @@ done
 [[ -d "$WORKSPACE" && -f "$POLICY" && $# -gt 0 ]] || { echo "invalid workspace, policy, or command" >&2; exit 2; }
 source "$POLICY"
 [[ "$WORKSPACE_MODE" == rw ]] || { echo "WORKSPACE_MODE must be rw" >&2; exit 2; }
-[[ "$EXPOSE_SSH" == 0 && "$EXPOSE_DOCKER" == 0 && "$EXPOSE_VOL1" == 0 ]] || { echo "sensitive-path exposure is disabled" >&2; exit 2; }
+[[ "$EXPOSE_DOCKER" == 0 && "$EXPOSE_VOL1" == 0 ]] || { echo "sensitive-path exposure is disabled" >&2; exit 2; }
 
 B=(bwrap
    --ro-bind /usr /usr
@@ -55,6 +55,11 @@ fi
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
 
 if [[ "$SSH" == 1 ]]; then
+  [[ "$EXPOSE_SSH" == 1 ]] || {
+    echo "SSH requested but EXPOSE_SSH is disabled by policy" >&2
+    exit 2
+  }
+
   SSH_KEY=/vol1/Docker/gemini/home/.ssh/id_ed25519_gemini
   SSH_KNOWN_HOSTS=/vol1/Docker/gemini/home/.ssh/known_hosts
   SSH_CONFIG="$BASE/adapters/opencode/ssh/config"
