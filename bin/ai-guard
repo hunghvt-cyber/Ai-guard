@@ -52,11 +52,15 @@ case "$WORKSPACE" in
  echo "workspace is a protected host path: $WORKSPACE" >&2
  exit 2
  ;;
+ /vol1/Docker)
+ echo "workspace must be a repository under /vol1/Docker" >&2
+ exit 2
+ ;;
+ /vol1/Docker/*)
+ ;;
  /vol1|/vol1/*)
- case "$WORKSPACE" in
-   /vol1/Docker/*) ;;
-   *) echo "workspace outside controlled repo root: $WORKSPACE" >&2; exit 2;;
- esac
+ echo "workspace outside controlled repo root: $WORKSPACE" >&2
+ exit 2
  ;;
 esac
 
