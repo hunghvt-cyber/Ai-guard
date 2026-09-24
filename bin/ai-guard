@@ -9,6 +9,7 @@ DEBUG=0
 PROGRAM=""
 SECRET_NAME=""
 SECRET_FILE=""
+SETENV_FILE=""
 usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--program PATH] [--secret-env NAME FILE] [--debug] -- COMMAND [ARGS...]"; }
 while [ "$#" -gt 0 ]; do
  case "$1" in
@@ -17,6 +18,7 @@ while [ "$#" -gt 0 ]; do
   --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2;;
   --program) [ "$#" -ge 2 ] || exit 2; PROGRAM=$2; shift 2;;
   --secret-env) [ "$#" -ge 3 ] || exit 2; SECRET_NAME=$2; SECRET_FILE=$3; shift 3;;
+  --setenv) [ "$#" -ge 3 ] || exit 2; case "$2" in [A-Za-z_][A-Za-z0-9_]*) ;; *) echo "invalid environment name" >&2; exit 2;; esac; case "$3" in *"$\n"*) echo "environment value contains newline" >&2; exit 2;; esac; if [ -z "$SETENV_FILE" ]; then SETENV_FILE=$(mktemp /tmp/ai-guard-setenv.XXXXXX); chmod 0600 "$SETENV_FILE"; fi; printf "%s\n%s\n" "$2" "$3" >> "$SETENV_FILE"; shift 3;;
   --debug) DEBUG=1; shift;;
   -h|--help) usage; exit 0;;
   --) shift; break;;
@@ -40,7 +42,7 @@ if [ -n "$PROGRAM" ]; then
  [ -f "$PROGRAM" ] || { echo "program is not a regular file: $PROGRAM" >&2; exit 2; }
  [ -x "$PROGRAM" ] || { echo "program is not executable: $PROGRAM" >&2; exit 2; }
  PROGRAM_STAGE=$(mktemp -d /tmp/ai-guard-program.XXXXXX)
- trap 'rm -rf "$PROGRAM_STAGE"' EXIT HUP INT TERM
+ trap 'rm -rf "$PROGRAM_STAGE"; [ -z "$SETENV_FILE" ] || rm -f "$SETENV_FILE"' EXIT HUP INT TERM
  cp "$PROGRAM" "$PROGRAM_STAGE/program"
  chmod 0555 "$PROGRAM_STAGE/program"
 fi
@@ -49,4 +51,4 @@ if [ -n "$SECRET_NAME" ]; then
  SECRET_FILE=$(readlink -f "$SECRET_FILE")
  [ -f "$SECRET_FILE" ] || { echo "secret file not found" >&2; exit 2; }
 fi
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-env "$SECRET_NAME" "$SECRET_FILE" --debug "$DEBUG" -- "$@"
+exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-env "$SECRET_NAME" "$SECRET_FILE" --setenv-file "$SETENV_FILE" --debug "$DEBUG" -- "$@"
