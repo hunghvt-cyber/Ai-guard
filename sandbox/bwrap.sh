@@ -39,6 +39,7 @@ fi
 [[ "$UTS_NAMESPACE" == 1 ]] && B+=(--unshare-uts)
 [[ "$REQUESTED_NETWORK" == none ]] && B+=(--unshare-net)
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
+B+=(--clearenv --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --setenv HOME /home/sandbox --setenv USER sandbox --setenv LOGNAME sandbox)
 if [[ -n "$SETENV_FILE" ]]; then
   [[ -f "$SETENV_FILE" ]] || { echo "setenv file missing" >&2; exit 2; }
   while IFS= read -r ENV_NAME && IFS= read -r ENV_VALUE; do
@@ -46,7 +47,7 @@ if [[ -n "$SETENV_FILE" ]]; then
     B+=(--setenv "$ENV_NAME" "$ENV_VALUE")
   done < "$SETENV_FILE"
 fi
-B+=(--clearenv --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --setenv HOME /home/sandbox --setenv USER sandbox --setenv LOGNAME sandbox --)
+B+=(--)
 CMD=("$@")
 if [[ -n "$PROGRAM_STAGE" ]]; then CMD=(/opt/ai-guard/program "${CMD[@]}"); fi
 if [[ -n "$SECRET_NAME" ]]; then
