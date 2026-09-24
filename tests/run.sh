@@ -10,6 +10,14 @@ printf 'ok\n' > "$W/input"
 
 guard(){ "$BASE/bin/ai-guard" --workspace "$W" --network none -- "$@"; }
 
+echo "== guarded program =="
+"$BASE/bin/ai-guard" --workspace "$W" --program /bin/sh --network none -- -c 'test "$PWD" = /workspace; touch /workspace/program-ok; test -f /workspace/program-ok'
+echo PASS
+
+echo "== secret environment =="
+printf 'SECRET_OK' > "$T/secret"
+"$BASE/bin/ai-guard" --workspace "$W" --program /bin/sh --secret-env TEST_SECRET "$T/secret" -- -c 'test "$TEST_SECRET" = SECRET_OK'
+echo PASS
 echo "== filesystem =="
 guard /bin/sh -c 'test -f /workspace/input; touch /workspace/write-ok; test -f /workspace/write-ok; ! touch /etc/ai-guard-write-test 2>/dev/null; ! test -e /vol1; ! test -e /home/admin/.ssh; ! test -e /root/.ssh'
 echo PASS
