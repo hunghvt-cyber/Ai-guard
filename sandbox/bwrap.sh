@@ -43,7 +43,7 @@ CMD=("$@")
 if [[ -n "$PROGRAM_STAGE" ]]; then CMD=(/opt/ai-guard/program "${CMD[@]}"); fi
 if [[ -n "$SECRET_NAME" ]]; then
  SCRIPT='secret=$(cat "$1"); export "$2=$secret"; shift 2; exec "$@"'
- CMD=(/bin/sh -c "$SCRIPT" /run/secrets/entry "$SECRET_DEST" "${CMD[@]}")
+ CMD=(/bin/sh -c "$SCRIPT" /run/secrets/entry "$SECRET_DEST" "$SECRET_NAME" "${CMD[@]}")
 fi
 if [[ "$DEBUG" == 1 ]]; then printf '%q ' "${B[@]}" >&2; printf '\n' >&2; fi
 exec "${B[@]}" "${CMD[@]}"
