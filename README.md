@@ -55,6 +55,14 @@ The default policy file must remain inside the Guard installation because it is 
 
 An egress-only mode using slirp4netns/pasta or an allowlisted proxy is a later hardening task.
 
+## Guarded programs and secrets
+
+A caller can ask the Guard to stage one executable read-only inside the sandbox with `--program PATH`. The Guard copies it to a private temporary staging directory before Bubblewrap starts; the writable workspace never contains the staged executable.
+
+A selected secret can be injected without placing its value on the Bubblewrap command line with `--secret-env NAME FILE`. The secret file is copied into the sandbox through Bubblewrap's file-descriptor data path and is exported only inside the sandbox process environment.
+
+The Clay adapter uses these mechanisms for `clay-worker`: it stages the worker read-only and injects only `GROQ_API_KEY`. The adapter intentionally keeps `--network none` as its default; Groq inference requires an explicit `--network host` until an egress-only policy exists.
+
 ## Current Gemini limitation
 
 The existing FnNAS Gemini launcher is a Docker/Compose launcher under `/vol1/Docker/gemini`. Safely wrapping that launcher cannot mean exposing all of `/vol1` or the Docker socket, because that would defeat the Guard boundary.
