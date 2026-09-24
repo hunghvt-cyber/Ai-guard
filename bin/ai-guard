@@ -1,59 +1,52 @@
 #!/bin/sh
 set -eu
-
 BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BASE=$(readlink -f "$BASE")
 WORKSPACE=$PWD
 NETWORK=none
 POLICY="$BASE/policy/default.conf"
 DEBUG=0
-
-usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--debug] -- COMMAND [ARGS...]"; }
-
+PROGRAM=""
+SECRET_NAME=""
+SECRET_FILE=""
+usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--program PATH] [--secret-env NAME FILE] [--debug] -- COMMAND [ARGS...]"; }
 while [ "$#" -gt 0 ]; do
  case "$1" in
   --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
   --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
   --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2;;
+  --program) [ "$#" -ge 2 ] || exit 2; PROGRAM=$2; shift 2;;
+  --secret-env) [ "$#" -ge 3 ] || exit 2; SECRET_NAME=$2; SECRET_FILE=$3; shift 3;;
   --debug) DEBUG=1; shift;;
   -h|--help) usage; exit 0;;
   --) shift; break;;
   *) echo "unknown option: $1" >&2; usage >&2; exit 2;;
  esac
 done
-
 [ "$#" -gt 0 ] || { echo "no command supplied" >&2; exit 2; }
 [ "$(id -u)" -ne 0 ] || { echo "ai-guard must not run as root" >&2; exit 2; }
 [ -d "$WORKSPACE" ] || { echo "workspace is not a directory: $WORKSPACE" >&2; exit 2; }
 [ -f "$POLICY" ] || { echo "policy not found: $POLICY" >&2; exit 2; }
-
 WORKSPACE=$(readlink -f "$WORKSPACE")
 POLICY=$(readlink -f "$POLICY")
-
-# The policy is sourced before entering the sandbox, so only trusted policy
-# files shipped under the Guard installation are accepted.
-case "$POLICY" in
- "$BASE"/*) ;;
- *) echo "policy must be inside the Guard installation" >&2; exit 2;;
-esac
-
-# Never let the writable workspace overlap the Guard installation.
-case "$WORKSPACE" in
- "$BASE"|"$BASE"/*)
- echo "workspace overlaps the Guard installation" >&2
- exit 2
- ;;
-esac
-
-# Refuse obvious host-control / sensitive filesystem roots as workspaces.
-case "$WORKSPACE" in
- /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
- echo "workspace is a protected host path: $WORKSPACE" >&2
- exit 2
- ;;
-esac
-
+case "$POLICY" in "$BASE"/*) ;; *) echo "policy must be inside the Guard installation" >&2; exit 2;; esac
+case "$WORKSPACE" in "$BASE"|"$BASE"/*) echo "workspace overlaps the Guard installation" >&2; exit 2;; esac
+case "$WORKSPACE" in /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*) echo "workspace is a protected host path: $WORKSPACE" >&2; exit 2;; esac
 case "$NETWORK" in none|host) ;; *) echo "invalid network mode" >&2; exit 2;; esac
 command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
-
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --debug "$DEBUG" -- "$@"
+PROGRAM_STAGE=""
+if [ -n "$PROGRAM" ]; then
+ PROGRAM=$(readlink -f "$PROGRAM")
+ [ -f "$PROGRAM" ] || { echo "program is not a regular file: $PROGRAM" >&2; exit 2; }
+ [ -x "$PROGRAM" ] || { echo "program is not executable: $PROGRAM" >&2; exit 2; }
+ PROGRAM_STAGE=$(mktemp -d /tmp/ai-guard-program.XXXXXX)
+ trap 'rm -rf "$PROGRAM_STAGE"' EXIT HUP INT TERM
+ cp "$PROGRAM" "$PROGRAM_STAGE/program"
+ chmod 0555 "$PROGRAM_STAGE/program"
+fi
+if [ -n "$SECRET_NAME" ]; then
+ case "$SECRET_NAME" in [A-Za-z_][A-Za-z0-9_]*) ;; *) echo "invalid secret environment name" >&2; exit 2;; esac
+ SECRET_FILE=$(readlink -f "$SECRET_FILE")
+ [ -f "$SECRET_FILE" ] || { echo "secret file not found" >&2; exit 2; }
+fi
+exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-env "$SECRET_NAME" "$SECRET_FILE" --debug "$DEBUG" -- "$@"
