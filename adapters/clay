@@ -20,8 +20,9 @@ done
 [ -n "$WORKER" ] || { echo "set --worker PATH or CLAY_WORKER" >&2; exit 2; }
 [ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
 [ -n "${GROQ_API_KEY:-}" ] || { echo "GROQ_API_KEY is required for this adapter" >&2; exit 2; }
+GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
 SECRET_DIR=$(mktemp -d /tmp/ai-guard-clay-secret.XXXXXX)
 trap 'rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
 umask 077
 printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
-exec "$BASE/bin/ai-guard" --workspace "$WORKSPACE" --network "$NETWORK" --program "$WORKER" --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY" -- "$@"
+exec "$BASE/bin/ai-guard" --workspace "$WORKSPACE" --network "$NETWORK" --program "$WORKER" --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY" --setenv CLAY_PROVIDER groq --setenv GROQ_MODEL "$GROQ_MODEL" -- "$@"
