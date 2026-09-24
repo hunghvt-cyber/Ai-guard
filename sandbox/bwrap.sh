@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 WORKSPACE=""; REQUESTED_NETWORK=none; POLICY=""; DEBUG=0
-PROGRAM_STAGE=""; SECRET_NAME=""; SECRET_FILE=""
+PROGRAM_STAGE=""; SECRET_NAME=""; SECRET_FILE=""; SETENV_FILE=""
 while [[ $# -gt 0 ]]; do
  case "$1" in
   --workspace) WORKSPACE="$2"; shift 2;;
@@ -9,6 +9,7 @@ while [[ $# -gt 0 ]]; do
   --policy) POLICY="$2"; shift 2;;
   --program-stage) PROGRAM_STAGE="$2"; shift 2;;
   --secret-env) SECRET_NAME="$2"; SECRET_FILE="$3"; shift 3;;
+  --setenv-file) SETENV_FILE="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
   --) shift; break;;
   *) echo "unknown backend option: $1" >&2; exit 2;;
@@ -38,6 +39,13 @@ fi
 [[ "$UTS_NAMESPACE" == 1 ]] && B+=(--unshare-uts)
 [[ "$REQUESTED_NETWORK" == none ]] && B+=(--unshare-net)
 [[ "$DIE_WITH_PARENT" == 1 ]] && B+=(--die-with-parent)
+if [[ -n "$SETENV_FILE" ]]; then
+  [[ -f "$SETENV_FILE" ]] || { echo "setenv file missing" >&2; exit 2; }
+  while IFS= read -r ENV_NAME && IFS= read -r ENV_VALUE; do
+    [[ "$ENV_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "invalid environment name" >&2; exit 2; }
+    B+=(--setenv "$ENV_NAME" "$ENV_VALUE")
+  done < "$SETENV_FILE"
+fi
 B+=(--clearenv --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --setenv HOME /home/sandbox --setenv USER sandbox --setenv LOGNAME sandbox --)
 CMD=("$@")
 if [[ -n "$PROGRAM_STAGE" ]]; then CMD=(/opt/ai-guard/program "${CMD[@]}"); fi
