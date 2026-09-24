@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+BASE=$(readlink -f "$BASE")
+WORKSPACE=$PWD
+NETWORK=none
+WORKER=${CLAY_WORKER:-}
+usage(){ echo "Usage: adapters/clay --worker PATH [--workspace PATH] [--network none|host] -- [clay-worker args...]"; }
+while [ "$#" -gt 0 ]; do
+ case "$1" in
+  --worker) [ "$#" -ge 2 ] || exit 2; WORKER=$2; shift 2;;
+  --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
+  --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
+  -h|--help) usage; exit 0;;
+  --) shift; break;;
+  *) echo "unknown option: $1" >&2; usage >&2; exit 2;;
+ esac
+done
+[ "$#" -gt 0 ] || { echo "no clay-worker arguments supplied" >&2; exit 2; }
+[ -n "$WORKER" ] || { echo "set --worker PATH or CLAY_WORKER" >&2; exit 2; }
+[ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
+[ -n "${GROQ_API_KEY:-}" ] || { echo "GROQ_API_KEY is required for this adapter" >&2; exit 2; }
+SECRET_DIR=$(mktemp -d /tmp/ai-guard-clay-secret.XXXXXX)
+trap 'rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
+umask 077
+printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
+exec "$BASE/bin/ai-guard" --workspace "$WORKSPACE" --network "$NETWORK" --program "$WORKER" --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY" -- "$@"
