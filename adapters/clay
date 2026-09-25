@@ -3,6 +3,20 @@ set -eu
 
 BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BASE=$(readlink -f "$BASE")
+
+# Load Groq credentials from the user's private Clay secret file when
+# GROQ_API_KEY is not already present in the environment. The key is
+# never printed, placed in argv, or copied into the workspace.
+CLAY_SECRET_ENV=${CLAY_SECRET_ENV:-"$HOME/.config/clay/groq.env"}
+if [ -z "${GROQ_API_KEY:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
+  GROQ_API_KEY=$(sed -n 's/^GROQ_API_KEY=//p' "$CLAY_SECRET_ENV" | head -n 1)
+  [ -n "$GROQ_API_KEY" ] && export GROQ_API_KEY
+fi
+
+if [ -z "${GROQ_MODEL:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
+  GROQ_MODEL=$(sed -n 's/^GROQ_MODEL=//p' "$CLAY_SECRET_ENV" | head -n 1)
+  [ -n "$GROQ_MODEL" ] && export GROQ_MODEL
+fi
 WORKSPACE=$PWD
 NETWORK=none
 WORKER=${CLAY_WORKER:-}
@@ -22,7 +36,7 @@ Provider configuration:
   groq   GROQ_API_KEY / GROQ_MODEL / optional GROQ_BASE_URL
   gemini 5-key selector from ~/.config/clay/gemini-keys
          CLAY_PROVIDER=custom
-         CLAY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+         CLAY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
          CUSTOM_MODEL=gemini-3.1-flash-lite
   custom CLAY_API_KEY / CLAY_BASE_URL / CUSTOM_MODEL
 EOF
@@ -58,17 +72,6 @@ SETENV_ARGS=""
 
 case "$PROVIDER" in
   groq)
-    CLAY_SECRET_ENV=${CLAY_SECRET_ENV:-"$HOME/.config/clay/groq.env"}
-
-    if [ -z "${GROQ_API_KEY:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
-      GROQ_API_KEY=$(sed -n 's/^GROQ_API_KEY=//p' "$CLAY_SECRET_ENV" | head -n 1)
-      [ -n "$GROQ_API_KEY" ] && export GROQ_API_KEY
-    fi
-    if [ -z "${GROQ_MODEL:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
-      GROQ_MODEL=$(sed -n 's/^GROQ_MODEL=//p' "$CLAY_SECRET_ENV" | head -n 1)
-      [ -n "$GROQ_MODEL" ] && export GROQ_MODEL
-    fi
-
     [ -n "${GROQ_API_KEY:-}" ] || { echo "GROQ_API_KEY is required" >&2; exit 2; }
     GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
     printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
@@ -160,7 +163,7 @@ case "$PROVIDER" in
 
     printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai/       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
     ;;
 
   custom)

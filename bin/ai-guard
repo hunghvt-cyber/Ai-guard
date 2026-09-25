@@ -33,7 +33,18 @@ WORKSPACE=$(readlink -f "$WORKSPACE")
 POLICY=$(readlink -f "$POLICY")
 case "$POLICY" in "$BASE"/*) ;; *) echo "policy must be inside the Guard installation" >&2; exit 2;; esac
 case "$WORKSPACE" in "$BASE"|"$BASE"/*) echo "workspace overlaps the Guard installation" >&2; exit 2;; esac
-case "$WORKSPACE" in /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/vol1|/vol1/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*) echo "workspace is a protected host path: $WORKSPACE" >&2; exit 2;; esac
+case "$WORKSPACE" in
+  /|/root|/root/*|/home|/home/*|/etc|/etc/*|/usr|/usr/*|/var|/var/*|/proc|/proc/*|/sys|/sys/*|/dev|/dev/*)
+    echo "workspace is a protected host path: $WORKSPACE" >&2
+    exit 2
+    ;;
+  /vol1/Docker/tapo-nas-lab)
+    ;;
+  /vol1|/vol1/*)
+    echo "workspace is not in the Guard workspace allowlist: $WORKSPACE" >&2
+    exit 2
+    ;;
+esac
 case "$NETWORK" in none|host) ;; *) echo "invalid network mode" >&2; exit 2;; esac
 command -v bwrap >/dev/null 2>&1 || { echo "bwrap not found" >&2; exit 127; }
 PROGRAM_STAGE=""
