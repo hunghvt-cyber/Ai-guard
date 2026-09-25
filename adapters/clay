@@ -89,7 +89,7 @@ case "$PROVIDER" in
       exit 2
     }
 
-    mode=$(stat -c '%a' "$KEYS_FILE" 2>/dev/null || true)
+    mode=$(stat -L -c '%a' "$KEYS_FILE" 2>/dev/null || true)
     case "$mode" in 400|440|600) ;;
       *) echo "Gemini key file must have restrictive permissions (400/440/600): $KEYS_FILE" >&2; exit 2 ;;
     esac
