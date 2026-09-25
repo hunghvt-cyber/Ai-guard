@@ -1,28 +1,181 @@
 #!/bin/sh
 set -eu
+
 BASE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 BASE=$(readlink -f "$BASE")
 WORKSPACE=$PWD
 NETWORK=none
 WORKER=${CLAY_WORKER:-}
-usage(){ echo "Usage: adapters/clay --worker PATH [--workspace PATH] [--network none|host] -- [clay-worker args...]"; }
+PROVIDER=${CLAY_PROVIDER:-groq}
+GEMINI_KEYS_FILE=${CLAY_GEMINI_KEYS_FILE:-"$HOME/.config/clay/gemini-keys"}
+GEMINI_STATE_FILE=${CLAY_GEMINI_STATE_FILE:-"$HOME/.config/clay/state/gemini-key-last-used"}
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  adapters/clay --worker PATH [--workspace PATH] [--network none|host]
+                 [--provider groq|gemini|custom]
+                 [--gemini-key N]
+                 -- [clay-worker args...]
+
+Provider configuration:
+  groq   GROQ_API_KEY / GROQ_MODEL / optional GROQ_BASE_URL
+  gemini 5-key selector from ~/.config/clay/gemini-keys
+         CLAY_PROVIDER=custom
+         CLAY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+         CUSTOM_MODEL=gemini-3.1-flash-lite
+  custom CLAY_API_KEY / CLAY_BASE_URL / CUSTOM_MODEL
+EOF
+}
+
 while [ "$#" -gt 0 ]; do
- case "$1" in
-  --worker) [ "$#" -ge 2 ] || exit 2; WORKER=$2; shift 2;;
-  --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
-  --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
-  -h|--help) usage; exit 0;;
-  --) shift; break;;
-  *) echo "unknown option: $1" >&2; usage >&2; exit 2;;
- esac
+  case "$1" in
+    --worker) [ "$#" -ge 2 ] || exit 2; WORKER=$2; shift 2 ;;
+    --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2 ;;
+    --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2 ;;
+    --provider) [ "$#" -ge 2 ] || exit 2; PROVIDER=$2; shift 2 ;;
+    --gemini-key) [ "$#" -ge 2 ] || exit 2; GEMINI_KEY_CHOICE=$2; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) echo "unknown option: $1" >&2; usage; exit 2 ;;
+  esac
 done
+
 [ "$#" -gt 0 ] || { echo "no clay-worker arguments supplied" >&2; exit 2; }
 [ -n "$WORKER" ] || { echo "set --worker PATH or CLAY_WORKER" >&2; exit 2; }
 [ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
-[ -n "${GROQ_API_KEY:-}" ] || { echo "GROQ_API_KEY is required for this adapter" >&2; exit 2; }
-GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
+
+case "$PROVIDER" in
+  groq|gemini|custom) ;;
+  *) echo "unsupported provider: $PROVIDER" >&2; exit 2 ;;
+esac
+
 SECRET_DIR=$(mktemp -d /tmp/ai-guard-clay-secret.XXXXXX)
 trap 'rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
 umask 077
-printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
-exec "$BASE/bin/ai-guard" --workspace "$WORKSPACE" --network "$NETWORK" --program "$WORKER" --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY" --setenv CLAY_PROVIDER groq --setenv GROQ_MODEL "$GROQ_MODEL" -- "$@"
+
+SETENV_ARGS=""
+
+case "$PROVIDER" in
+  groq)
+    CLAY_SECRET_ENV=${CLAY_SECRET_ENV:-"$HOME/.config/clay/groq.env"}
+
+    if [ -z "${GROQ_API_KEY:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
+      GROQ_API_KEY=$(sed -n 's/^GROQ_API_KEY=//p' "$CLAY_SECRET_ENV" | head -n 1)
+      [ -n "$GROQ_API_KEY" ] && export GROQ_API_KEY
+    fi
+    if [ -z "${GROQ_MODEL:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
+      GROQ_MODEL=$(sed -n 's/^GROQ_MODEL=//p' "$CLAY_SECRET_ENV" | head -n 1)
+      [ -n "$GROQ_MODEL" ] && export GROQ_MODEL
+    fi
+
+    [ -n "${GROQ_API_KEY:-}" ] || { echo "GROQ_API_KEY is required" >&2; exit 2; }
+    GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
+    printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
+
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       -- "$@"
+    ;;
+
+  gemini)
+    KEYS_FILE=$GEMINI_KEYS_FILE
+    STATE_FILE=$GEMINI_STATE_FILE
+
+    [ -r "$KEYS_FILE" ] || {
+      echo "Gemini key file not found: $KEYS_FILE" >&2
+      echo "Copy the existing KEY1=... KEY5=... file there with mode 0600." >&2
+      exit 2
+    }
+
+    mode=$(stat -c '%a' "$KEYS_FILE" 2>/dev/null || true)
+    case "$mode" in 400|440|600) ;;
+      *) echo "Gemini key file must have restrictive permissions (400/440/600): $KEYS_FILE" >&2; exit 2 ;;
+    esac
+
+    mkdir -p "$(dirname "$STATE_FILE")"
+    chmod 700 "$(dirname "$STATE_FILE")" 2>/dev/null || true
+    touch "$STATE_FILE"
+    chmod 600 "$STATE_FILE"
+
+    KEYS=""
+    while IFS='=' read -r name secret; do
+      case "$name" in
+        KEY[0-9]*)
+          [ -n "$secret" ] || continue
+          case " $KEYS " in *" $name "*) continue ;; esac
+          KEYS="$KEYS $name"
+          eval "SECRET_$name=$secret"
+          ;;
+      esac
+    done < "$KEYS_FILE"
+
+    set -- $KEYS
+    COUNT=$#
+    [ "$COUNT" -gt 0 ] || { echo "no KEY<n>=... entries found in $KEYS_FILE" >&2; exit 2; }
+
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+      SELECTED_NAME=ENV
+      SELECTED_SECRET=$GEMINI_API_KEY
+    else
+      now=$(date +%s)
+      echo "Gemini API Key"
+      echo ""
+      i=1
+      for name in "$@"; do
+        ts=$(awk -F'|' -v n="$name" '$1==n {print $2; exit}' "$STATE_FILE")
+        if [ -z "$ts" ]; then
+          printf '%d. %-10s %-20s [AVAILABLE]\n' "$i" "$name" "never used"
+        else
+          diff=$((now - ts))
+          [ "$diff" -lt 0 ] && diff=0
+          h=$((diff / 3600))
+          m=$(((diff % 3600) / 60))
+          status=""
+          [ "$diff" -ge 18000 ] && status="[AVAILABLE]"
+          printf '%d. %-10s used %dh %dm ago %-10s\n' "$i" "$name" "$h" "$m" "$status"
+        fi
+        i=$((i + 1))
+      done
+
+      choice=${GEMINI_KEY_CHOICE:-}
+      if [ -z "$choice" ]; then
+        while :; do
+          printf 'Select key [1-%d]: ' "$COUNT"
+          IFS= read -r choice
+          case "$choice" in
+            ''|*[!0-9]*) echo "Invalid selection." ;;
+            *)
+              [ "$choice" -ge 1 ] && [ "$choice" -le "$COUNT" ] && break
+              echo "Invalid selection."
+              ;;
+          esac
+        done
+      fi
+
+      SELECTED_NAME=$(printf '%s\n' "$@" | sed -n "${choice}p")
+      eval "SELECTED_SECRET=\${SECRET_$SELECTED_NAME}"
+      [ -n "$SELECTED_SECRET" ] || { echo "selected Gemini key is empty" >&2; exit 2; }
+
+      now=$(date +%s)
+      tmp_state=$(mktemp "${STATE_FILE}.XXXXXX")
+      trap 'rm -f "$tmp_state"; rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
+      awk -F'|' -v selected="$SELECTED_NAME" '$1 != selected && $1 != "" {print}' "$STATE_FILE" > "$tmp_state"
+      printf '%s|%s\n' "$SELECTED_NAME" "$now" >> "$tmp_state"
+      chmod 600 "$tmp_state"
+      mv "$tmp_state" "$STATE_FILE"
+    fi
+
+    printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
+
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai/       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
+    ;;
+
+  custom)
+    [ -n "${CLAY_API_KEY:-}" ] || { echo "CLAY_API_KEY is required for custom provider" >&2; exit 2; }
+    [ -n "${CLAY_BASE_URL:-}" ] || { echo "CLAY_BASE_URL is required for custom provider" >&2; exit 2; }
+    [ -n "${CUSTOM_MODEL:-}" ] || { echo "CUSTOM_MODEL is required for custom provider" >&2; exit 2; }
+
+    printf '%s' "$CLAY_API_KEY" > "$SECRET_DIR/CLAY_API_KEY"
+
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$CLAY_BASE_URL"       --setenv CUSTOM_MODEL "$CUSTOM_MODEL"       -- "$@"
+    ;;
+esac
