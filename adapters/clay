@@ -96,20 +96,16 @@ case "$PROVIDER" in
     touch "$STATE_FILE"
     chmod 600 "$STATE_FILE"
 
-    KEYS=""
+    KEY_INDEX=$(mktemp)
+    trap 'rm -f "$KEY_INDEX"; rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
+
     while IFS='=' read -r name secret; do
       case "$name" in
-        KEY[0-9]*)
-          [ -n "$secret" ] || continue
-          case " $KEYS " in *" $name "*) continue ;; esac
-          KEYS="$KEYS $name"
-          eval "SECRET_$name=$secret"
-          ;;
+        KEY[0-9]*) [ -n "$secret" ] && printf '%s\n' "$name" >> "$KEY_INDEX" ;;
       esac
     done < "$KEYS_FILE"
 
-    set -- $KEYS
-    COUNT=$#
+    COUNT=$(wc -l < "$KEY_INDEX")
     [ "$COUNT" -gt 0 ] || { echo "no KEY<n>=... entries found in $KEYS_FILE" >&2; exit 2; }
 
     if [ -n "${GEMINI_API_KEY:-}" ]; then
@@ -120,7 +116,7 @@ case "$PROVIDER" in
       echo "Gemini API Key"
       echo ""
       i=1
-      for name in "$@"; do
+      while IFS= read -r name; do
         ts=$(awk -F'|' -v n="$name" '$1==n {print $2; exit}' "$STATE_FILE")
         if [ -z "$ts" ]; then
           printf '%d. %-10s %-20s [AVAILABLE]\n' "$i" "$name" "never used"
@@ -134,7 +130,7 @@ case "$PROVIDER" in
           printf '%d. %-10s used %dh %dm ago %-10s\n' "$i" "$name" "$h" "$m" "$status"
         fi
         i=$((i + 1))
-      done
+      done < "$KEY_INDEX"
 
       choice=${GEMINI_KEY_CHOICE:-}
       if [ -z "$choice" ]; then
@@ -143,21 +139,19 @@ case "$PROVIDER" in
           IFS= read -r choice
           case "$choice" in
             ''|*[!0-9]*) echo "Invalid selection." ;;
-            *)
-              [ "$choice" -ge 1 ] && [ "$choice" -le "$COUNT" ] && break
-              echo "Invalid selection."
-              ;;
+            *) [ "$choice" -ge 1 ] && [ "$choice" -le "$COUNT" ] && break; echo "Invalid selection." ;;
           esac
         done
       fi
 
-      SELECTED_NAME=$(printf '%s\n' "$@" | sed -n "${choice}p")
-      eval "SELECTED_SECRET=\${SECRET_$SELECTED_NAME}"
+      SELECTED_NAME=$(sed -n "${choice}p" "$KEY_INDEX")
+      SELECTED_LINE=$(grep -m 1 "^$SELECTED_NAME=" "$KEYS_FILE")
+      SELECTED_SECRET=${SELECTED_LINE#*=}
+      unset SELECTED_LINE
       [ -n "$SELECTED_SECRET" ] || { echo "selected Gemini key is empty" >&2; exit 2; }
 
       now=$(date +%s)
       tmp_state=$(mktemp "${STATE_FILE}.XXXXXX")
-      trap 'rm -f "$tmp_state"; rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
       awk -F'|' -v selected="$SELECTED_NAME" '$1 != selected && $1 != "" {print}' "$STATE_FILE" > "$tmp_state"
       printf '%s|%s\n' "$SELECTED_NAME" "$now" >> "$tmp_state"
       chmod 600 "$tmp_state"
