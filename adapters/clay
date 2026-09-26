@@ -21,6 +21,7 @@ WORKSPACE=$PWD
 NETWORK=none
 WORKER=${CLAY_WORKER:-}
 PROVIDER=${CLAY_PROVIDER:-groq}
+SSH_KEY_FILE=${CLAY_SSH_KEY_FILE:-}
 GEMINI_KEYS_FILE=${CLAY_GEMINI_KEYS_FILE:-"$HOME/.config/clay/gemini-keys"}
 GEMINI_STATE_FILE=${CLAY_GEMINI_STATE_FILE:-"$HOME/.config/clay/state/gemini-key-last-used"}
 
@@ -31,6 +32,9 @@ Usage:
                  [--provider groq|gemini|custom]
                  [--gemini-key N]
                  -- [clay-worker args...]
+
+Optional host SSH capability:
+  --ssh-key FILE  inject a dedicated private SSH key as /run/secrets/CLAY_SSH_KEY
 
 Provider configuration:
   groq   GROQ_API_KEY / GROQ_MODEL / optional GROQ_BASE_URL
@@ -48,6 +52,7 @@ while [ "$#" -gt 0 ]; do
     --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2 ;;
     --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2 ;;
     --provider) [ "$#" -ge 2 ] || exit 2; PROVIDER=$2; shift 2 ;;
+    --ssh-key) [ "$#" -ge 2 ] || exit 2; SSH_KEY_FILE=$2; shift 2 ;;
     --gemini-key) [ "$#" -ge 2 ] || exit 2; GEMINI_KEY_CHOICE=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; break ;;
@@ -69,6 +74,12 @@ trap 'rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
 umask 077
 
 SETENV_ARGS=""
+SSH_GUARD_ARGS=""
+if [ -n "$SSH_KEY_FILE" ]; then
+  SSH_KEY_FILE=$(readlink -f "$SSH_KEY_FILE")
+  [ -f "$SSH_KEY_FILE" ] || { echo "SSH key file not found: $SSH_KEY_FILE" >&2; exit 2; }
+  SSH_GUARD_ARGS="--secret-file CLAY_SSH_KEY $SSH_KEY_FILE --setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY"
+fi
 
 case "$PROVIDER" in
   groq)
@@ -76,7 +87,7 @@ case "$PROVIDER" in
     GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
     printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       $SSH_GUARD_ARGS       -- "$@"
     ;;
 
   gemini)
@@ -163,7 +174,7 @@ case "$PROVIDER" in
 
     printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       $SSH_GUARD_ARGS       -- "$@"
     ;;
 
   custom)
@@ -173,6 +184,6 @@ case "$PROVIDER" in
 
     printf '%s' "$CLAY_API_KEY" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$CLAY_BASE_URL"       --setenv CUSTOM_MODEL "$CUSTOM_MODEL"       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$CLAY_BASE_URL"       --setenv CUSTOM_MODEL "$CUSTOM_MODEL"       $SSH_GUARD_ARGS       -- "$@"
     ;;
 esac
