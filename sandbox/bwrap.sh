@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 WORKSPACE=""; REQUESTED_NETWORK=none; POLICY=""; DEBUG=0
-PROGRAM_STAGE=""; SECRET_NAME=""; SECRET_FILE=""; SECRET_FILE_NAME=""; SETENV_FILE=""
+PROGRAM_STAGE=""; SECRET_NAME=""; SECRET_ENV_FILE=""; SECRET_FILE=""; SECRET_FILE_NAME=""; SETENV_FILE=""
 while [[ $# -gt 0 ]]; do
  case "$1" in
   --workspace) WORKSPACE="$2"; shift 2;;
   --network) REQUESTED_NETWORK="$2"; shift 2;;
   --policy) POLICY="$2"; shift 2;;
   --program-stage) PROGRAM_STAGE="$2"; shift 2;;
-  --secret-env) SECRET_NAME="$2"; SECRET_FILE="$3"; SECRET_FILE_NAME=""; shift 3;;
+  --secret-env) SECRET_NAME="$2"; SECRET_ENV_FILE="$3"; shift 3;;
   --secret-file) SECRET_FILE_NAME="$2"; SECRET_FILE="$3"; shift 3;;
   --setenv-file) SETENV_FILE="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
@@ -31,8 +31,8 @@ fi
 SECRET_DEST=""
 SECRET_FILE_DEST=""
 if [[ -n "$SECRET_NAME" ]]; then
- [[ -f "$SECRET_FILE" ]] || { echo "secret file missing" >&2; exit 2; }
- exec {SECRET_FD}<"$SECRET_FILE"
+ [[ -f "$SECRET_ENV_FILE" ]] || { echo "secret file missing" >&2; exit 2; }
+ exec {SECRET_FD}<"$SECRET_ENV_FILE"
  B+=(--dir /run --dir /run/secrets --ro-bind-data "$SECRET_FD" "/run/secrets/$SECRET_NAME")
  SECRET_DEST="/run/secrets/$SECRET_NAME"
 fi
