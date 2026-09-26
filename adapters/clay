@@ -64,6 +64,12 @@ done
 [ -n "$WORKER" ] || { echo "set --worker PATH or CLAY_WORKER" >&2; exit 2; }
 [ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
 
+if [ -n "$SSH_KEY_FILE" ]; then
+  [ "$NETWORK" = host ] || { echo "--ssh-key requires --network host" >&2; exit 2; }
+  mode=$(stat -L -c "%a" "$SSH_KEY_FILE" 2>/dev/null || true)
+  case "$mode" in 400|440|600) ;; *) echo "SSH key must have restrictive permissions (400/440/600): $SSH_KEY_FILE" >&2; exit 2;; esac
+fi
+
 case "$PROVIDER" in
   groq|gemini|custom) ;;
   *) echo "unsupported provider: $PROVIDER" >&2; exit 2 ;;
