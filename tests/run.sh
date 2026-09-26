@@ -19,7 +19,7 @@ printf 'SECRET_OK' > "$T/secret"
 "$BASE/bin/ai-guard" --workspace "$W" --program /bin/sh --secret-env TEST_SECRET "$T/secret" -- -c 'test "$TEST_SECRET" = SECRET_OK'
 echo PASS
 
-echo "== secret file ==
+echo "== secret file =="
 printf "SSH_PRIVATE_KEY_TEST" > "$T/ssh-key"
 "$BASE/bin/ai-guard" --workspace "$W" --secret-file CLAY_SSH_KEY "$T/ssh-key" -- /bin/sh -c 'test -f /run/secrets/CLAY_SSH_KEY; test "$(cat /run/secrets/CLAY_SSH_KEY)" = SSH_PRIVATE_KEY_TEST; test ! -e /workspace/ssh-key'
 echo PASS
