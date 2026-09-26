@@ -67,7 +67,30 @@ done
 if [ -n "$SSH_KEY_FILE" ]; then
   [ "$NETWORK" = host ] || { echo "--ssh-key requires --network host" >&2; exit 2; }
   mode=$(stat -L -c "%a" "$SSH_KEY_FILE" 2>/dev/null || true)
-  case "$mode" in 400|440|600) ;; *) echo "SSH key must have restrictive permissions (400/440/600): $SSH_KEY_FILE" >&2; exit 2;; esac
+  case "$mode" in
+    400|440|600) ;;
+    *)
+      # A named ACL may grant the invoking admin user read access while keeping
+      # group:: and other:: unreadable. Accept only that narrow ACL form.
+      [ "$mode" = 640 ] || {
+        echo "SSH key must have restrictive permissions (400/440/600), or the approved admin-read ACL form: $SSH_KEY_FILE" >&2
+        exit 2
+      }
+      acl=$(getfacl -cp "$SSH_KEY_FILE" 2>/dev/null || true)
+      printf '%s\n' "$acl" | grep -Fxq 'user:admin:r--' || {
+        echo "SSH key ACL must grant only admin read access: $SSH_KEY_FILE" >&2
+        exit 2
+      }
+      printf '%s\n' "$acl" | grep -Fxq 'group::---' || {
+        echo "SSH key ACL group:: must have no access: $SSH_KEY_FILE" >&2
+        exit 2
+      }
+      printf '%s\n' "$acl" | grep -Fxq 'other::---' || {
+        echo "SSH key ACL other:: must have no access: $SSH_KEY_FILE" >&2
+        exit 2
+      }
+      ;;
+  esac
 fi
 
 case "$PROVIDER" in
