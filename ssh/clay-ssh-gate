@@ -1,0 +1,84 @@
+#!/bin/sh
+set -eu
+
+# Clay-only SSH gate.
+# This script is intended to be used as an OpenSSH authorized_keys
+# forced command. It never starts a shell and never evaluates SSH_ORIGINAL_COMMAND
+# as shell syntax.
+
+BASE="/vol1/Docker/tapo-nas-lab"
+
+deny() {
+  echo "DENY: $1" >&2
+  exit 126
+}
+
+cmd=${SSH_ORIGINAL_COMMAND:-}
+[ -n "$cmd" ] || deny "interactive shell disabled"
+
+# Reject shell metacharacters, options that can change command semantics,
+# traversal, and control characters before any parsing.
+case "$cmd" in
+  *[\'\"\`\$\;\|\&\<\>\(\)\{\}\[\]\!\~\*\?\\]*|*[[:space:]]\;*|*..*|*[[:cntrl:]]*)
+    deny "invalid command syntax"
+    ;;
+esac
+
+set -- $cmd
+verb=${1:-}
+arg=${2:-}
+extra=${3:-}
+[ -z "$extra" ] || deny "too many arguments"
+
+case "$verb" in
+  uptime)
+    [ -z "$arg" ] || deny "uptime takes no arguments"
+    exec /usr/bin/uptime
+    ;;
+  free)
+    [ -z "$arg" ] || deny "free takes no arguments"
+    exec /usr/bin/free -h
+    ;;
+  df)
+    [ -z "$arg" ] || deny "df takes no arguments"
+    exec /bin/df -h /vol1
+    ;;
+  status)
+    [ -z "$arg" ] || deny "status takes no arguments"
+    printf '%s\n' "AI Guard Clay SSH gate: OK"
+    printf 'workspace=%s\n' "$BASE"
+    exec /usr/bin/date -Is
+    ;;
+  read)
+    [ -n "$arg" ] || deny "read requires an absolute path"
+    case "$arg" in
+      "$BASE"/*) ;;
+      *) deny "read path outside Tapo workspace" ;;
+    esac
+    [ -f "$arg" ] || deny "not a regular file"
+    exec /usr/bin/sed -n '1,240p' -- "$arg"
+    ;;
+  stat)
+    [ -n "$arg" ] || deny "stat requires an absolute path"
+    case "$arg" in
+      "$BASE"/*) ;;
+      *) deny "stat path outside Tapo workspace" ;;
+    esac
+    exec /usr/bin/stat -- "$arg"
+    ;;
+  list)
+    [ -z "$arg" ] || deny "list takes no arguments"
+    exec /usr/bin/find "$BASE" -maxdepth 2 -type f -print
+    ;;
+  systemctl-status)
+    [ -n "$arg" ] || deny "systemctl-status requires a unit"
+    case "$arg" in
+      [A-Za-z0-9_.@-]*) ;;
+      *) deny "invalid systemd unit" ;;
+    esac
+    exec /usr/bin/systemctl status --no-pager --full "$arg"
+    ;;
+  *)
+    deny "operation not allowlisted"
+    ;;
+esac
