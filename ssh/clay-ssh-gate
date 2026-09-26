@@ -2,9 +2,8 @@
 set -eu
 
 # Clay-only SSH gate.
-# This script is intended to be used as an OpenSSH authorized_keys
-# forced command. It never starts a shell and never evaluates SSH_ORIGINAL_COMMAND
-# as shell syntax.
+# Intended for an OpenSSH authorized_keys forced command.
+# Never starts a shell and never evaluates SSH_ORIGINAL_COMMAND as shell syntax.
 
 BASE="/vol1/Docker/tapo-nas-lab"
 
@@ -13,13 +12,27 @@ deny() {
   exit 126
 }
 
+resolve_tapo_path() {
+  input=$1
+  case "$input" in
+    "$BASE"/*) ;;
+    *) deny "path outside Tapo workspace" ;;
+  esac
+  resolved=$(readlink -f -- "$input" 2>/dev/null || true)
+  [ -n "$resolved" ] || deny "path cannot be resolved"
+  case "$resolved" in
+    "$BASE"/*) ;;
+    *) deny "resolved path outside Tapo workspace" ;;
+  esac
+  printf '%s\n' "$resolved"
+}
+
 cmd=${SSH_ORIGINAL_COMMAND:-}
 [ -n "$cmd" ] || deny "interactive shell disabled"
 
-# Reject shell metacharacters, options that can change command semantics,
-# traversal, and control characters before any parsing.
+# Reject shell metacharacters, traversal, and control characters before parsing.
 case "$cmd" in
-  *[\'\"\`\$\;\|\&\<\>\(\)\{\}\[\]\!\~\*\?\\]*|*[[:space:]]\;*|*..*|*[[:cntrl:]]*)
+  *[\'\"\`\$\;\|\&\<\>\(\)\{\}\[\]\!\~\*\?\\]*|*..*|*[[:cntrl:]]*)
     deny "invalid command syntax"
     ;;
 esac
@@ -51,20 +64,14 @@ case "$verb" in
     ;;
   read)
     [ -n "$arg" ] || deny "read requires an absolute path"
-    case "$arg" in
-      "$BASE"/*) ;;
-      *) deny "read path outside Tapo workspace" ;;
-    esac
-    [ -f "$arg" ] || deny "not a regular file"
-    exec /usr/bin/sed -n '1,240p' -- "$arg"
+    resolved=$(resolve_tapo_path "$arg")
+    [ -f "$resolved" ] || deny "not a regular file"
+    exec /usr/bin/sed -n '1,240p' -- "$resolved"
     ;;
   stat)
     [ -n "$arg" ] || deny "stat requires an absolute path"
-    case "$arg" in
-      "$BASE"/*) ;;
-      *) deny "stat path outside Tapo workspace" ;;
-    esac
-    exec /usr/bin/stat -- "$arg"
+    resolved=$(resolve_tapo_path "$arg")
+    exec /usr/bin/stat -- "$resolved"
     ;;
   list)
     [ -z "$arg" ] || deny "list takes no arguments"
