@@ -25,7 +25,7 @@ AI Guard is agent-agnostic: adapters select the CLI, while the Guard owns the OS
 - `/home`, `/root`, and `/tmp` are sandbox-local
 - `/vol1` is not mounted
 - Docker/containerd sockets are not mounted
-- SSH credentials are not mounted
+- SSH credentials are not mounted by default; explicit SSH capability uses a file secret
 - PID, IPC and UTS namespaces are isolated
 - all Linux capabilities are dropped inside the sandbox
 - a new session is created for the sandbox process
@@ -59,7 +59,7 @@ An egress-only mode using slirp4netns/pasta or an allowlisted proxy is a later h
 
 A caller can ask the Guard to stage one executable read-only inside the sandbox with `--program PATH`. The Guard copies it to a private temporary staging directory before Bubblewrap starts; the writable workspace never contains the staged executable.
 
-A selected secret can be injected without placing its value on the Bubblewrap command line with `--secret-env NAME FILE`. The secret file is copied into the sandbox through Bubblewrap's file-descriptor data path and is exported only inside the sandbox process environment.
+A selected secret can be injected without placing its value on the Bubblewrap command line with `--secret-env NAME FILE`. The secret file is copied into the sandbox through Bubblewrap's file-descriptor data path and is exported only inside the sandbox process environment. File secrets can instead be injected with `--secret-file NAME FILE`; these are mounted read-only at `/run/secrets/NAME` without becoming environment variables. Clay uses this primitive for its optional dedicated SSH private key.
 
 The Clay adapter uses these mechanisms for `clay-worker`: it stages the worker read-only and injects only `GROQ_API_KEY`. The adapter intentionally keeps `--network none` as its default; Groq inference requires an explicit `--network host` until an egress-only policy exists.
 
