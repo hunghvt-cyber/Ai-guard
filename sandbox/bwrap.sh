@@ -9,7 +9,7 @@ while [[ $# -gt 0 ]]; do
   --policy) POLICY="$2"; shift 2;;
   --program-stage) PROGRAM_STAGE="$2"; shift 2;;
   --secret-env) SECRET_NAME="$2"; SECRET_FILE="$3"; SECRET_FILE_NAME=""; shift 3;;
-  --secret-file) SECRET_FILE_NAME="$2"; SECRET_FILE="$3"; SECRET_NAME=""; shift 3;;
+  --secret-file) SECRET_FILE_NAME="$2"; SECRET_FILE="$3"; shift 3;;
   --setenv-file) SETENV_FILE="$2"; shift 2;;
   --debug) DEBUG="$2"; shift 2;;
   --) shift; break;;
