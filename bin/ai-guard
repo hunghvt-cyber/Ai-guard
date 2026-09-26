@@ -9,15 +9,17 @@ DEBUG=0
 PROGRAM=""
 SECRET_NAME=""
 SECRET_FILE=""
+SECRET_FILE_NAME=""
 SETENV_FILE=""
-usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--program PATH] [--secret-env NAME FILE] [--debug] -- COMMAND [ARGS...]"; }
+usage(){ echo "Usage: ai-guard [--workspace PATH] [--network none|host] [--policy PATH] [--program PATH] [--secret-env NAME FILE] [--secret-file NAME FILE] [--debug] -- COMMAND [ARGS...]"; }
 while [ "$#" -gt 0 ]; do
  case "$1" in
   --workspace) [ "$#" -ge 2 ] || exit 2; WORKSPACE=$2; shift 2;;
   --network) [ "$#" -ge 2 ] || exit 2; NETWORK=$2; shift 2;;
   --policy) [ "$#" -ge 2 ] || exit 2; POLICY=$2; shift 2;;
   --program) [ "$#" -ge 2 ] || exit 2; PROGRAM=$2; shift 2;;
-  --secret-env) [ "$#" -ge 3 ] || exit 2; SECRET_NAME=$2; SECRET_FILE=$3; shift 3;;
+  --secret-env) [ "$#" -ge 3 ] || exit 2; SECRET_NAME=$2; SECRET_FILE=$3; SECRET_FILE_NAME=""; shift 3;;
+  --secret-file) [ "$#" -ge 3 ] || exit 2; SECRET_FILE_NAME=$2; SECRET_FILE=$3; SECRET_NAME=""; shift 3;;
   --setenv) [ "$#" -ge 3 ] || exit 2; case "$2" in [A-Za-z_][A-Za-z0-9_]*) ;; *) echo "invalid environment name" >&2; exit 2;; esac; case "$3" in *"$\n"*) echo "environment value contains newline" >&2; exit 2;; esac; if [ -z "$SETENV_FILE" ]; then SETENV_FILE=$(mktemp /tmp/ai-guard-setenv.XXXXXX); chmod 0600 "$SETENV_FILE"; fi; printf "%s\n%s\n" "$2" "$3" >> "$SETENV_FILE"; shift 3;;
   --debug) DEBUG=1; shift;;
   -h|--help) usage; exit 0;;
@@ -62,4 +64,15 @@ if [ -n "$SECRET_NAME" ]; then
  SECRET_FILE=$(readlink -f "$SECRET_FILE")
  [ -f "$SECRET_FILE" ] || { echo "secret file not found" >&2; exit 2; }
 fi
-exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-env "$SECRET_NAME" "$SECRET_FILE" --setenv-file "$SETENV_FILE" --debug "$DEBUG" -- "$@"
+if [ -n "$SECRET_FILE_NAME" ]; then
+ case "$SECRET_FILE_NAME" in [A-Za-z_][A-Za-z0-9_]*) ;; *) echo "invalid secret file name" >&2; exit 2;; esac
+ SECRET_FILE=$(readlink -f "$SECRET_FILE")
+ [ -f "$SECRET_FILE" ] || { echo "secret file not found" >&2; exit 2; }
+fi
+if [ -n "$SECRET_NAME" ]; then
+  exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-env "$SECRET_NAME" "$SECRET_FILE" --setenv-file "$SETENV_FILE" --debug "$DEBUG" -- "$@"
+elif [ -n "$SECRET_FILE_NAME" ]; then
+  exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --secret-file "$SECRET_FILE_NAME" "$SECRET_FILE" --setenv-file "$SETENV_FILE" --debug "$DEBUG" -- "$@"
+else
+  exec "$BASE/sandbox/bwrap.sh" --workspace "$WORKSPACE" --network "$NETWORK" --policy "$POLICY" --program-stage "$PROGRAM_STAGE" --setenv-file "$SETENV_FILE" --debug "$DEBUG" -- "$@"
+fi
