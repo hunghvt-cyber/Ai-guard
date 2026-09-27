@@ -167,6 +167,23 @@ case "$PROVIDER" in
     ;;
 
   custom)
+    # For the canonical OpenRouter store, map OPENROUTER_* names to the
+    # generic Clay custom-provider contract without exposing secret values.
+    # The file is parsed as KEY=VALUE data; it is never sourced as shell code.
+    CUSTOM_SECRET_ENV=${CLAY_CUSTOM_SECRET_ENV:-/vol1/Docker/ai-cli-lab/secrets/openrouter.env}
+    if [ -z "${CLAY_API_KEY:-}" ] && [ -r "$CUSTOM_SECRET_ENV" ]; then
+      CLAY_API_KEY=$(sed -n 's/^OPENROUTER_API_KEY=//p' "$CUSTOM_SECRET_ENV" | head -n 1)
+      [ -n "$CLAY_API_KEY" ] && export CLAY_API_KEY
+    fi
+    if [ -z "${CLAY_BASE_URL:-}" ] && [ -r "$CUSTOM_SECRET_ENV" ]; then
+      CLAY_BASE_URL=$(sed -n 's/^OPENROUTER_BASE_URL=//p' "$CUSTOM_SECRET_ENV" | head -n 1)
+      [ -n "$CLAY_BASE_URL" ] && export CLAY_BASE_URL
+    fi
+    if [ -z "${CUSTOM_MODEL:-}" ] && [ -r "$CUSTOM_SECRET_ENV" ]; then
+      CUSTOM_MODEL=$(sed -n 's/^OPENROUTER_MODEL=//p' "$CUSTOM_SECRET_ENV" | head -n 1)
+      [ -n "$CUSTOM_MODEL" ] && export CUSTOM_MODEL
+    fi
+
     [ -n "${CLAY_API_KEY:-}" ] || { echo "CLAY_API_KEY is required for custom provider" >&2; exit 2; }
     [ -n "${CLAY_BASE_URL:-}" ] || { echo "CLAY_BASE_URL is required for custom provider" >&2; exit 2; }
     [ -n "${CUSTOM_MODEL:-}" ] || { echo "CUSTOM_MODEL is required for custom provider" >&2; exit 2; }
