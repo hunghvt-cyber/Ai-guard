@@ -32,6 +32,7 @@ Usage:
   adapters/clay --worker PATH [--workspace PATH] [--network none|host]
                  [--provider groq|gemini|custom]
                  [--gemini-key N]
+                 [--clay-sandbox-mode sandbox|sandbox-auto|unleashed|unleashed-auto]
                  -- [clay-worker args...]
 
 Optional host SSH capability:
@@ -215,7 +216,7 @@ case "$PROVIDER" in
 
     printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       $CLAY_SANDBOX_ARGS       -- "$@"
     ;;
 
   custom)
@@ -225,6 +226,6 @@ case "$PROVIDER" in
 
     printf '%s' "$CLAY_API_KEY" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$CLAY_BASE_URL"       --setenv CUSTOM_MODEL "$CUSTOM_MODEL"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$CLAY_BASE_URL"       --setenv CUSTOM_MODEL "$CUSTOM_MODEL"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       $CLAY_SANDBOX_ARGS       -- "$@"
     ;;
 esac
