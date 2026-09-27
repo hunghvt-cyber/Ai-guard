@@ -22,6 +22,7 @@ NETWORK=none
 WORKER=${CLAY_WORKER:-}
 PROVIDER=${CLAY_PROVIDER:-groq}
 SSH_KEY_FILE=${CLAY_SSH_KEY_FILE:-}
+CLAY_SANDBOX_MODE=${CLAY_SANDBOX_MODE:-}
 GEMINI_KEYS_FILE=${CLAY_GEMINI_KEYS_FILE:-"$HOME/.config/clay/gemini-keys"}
 GEMINI_STATE_FILE=${CLAY_GEMINI_STATE_FILE:-"$HOME/.config/clay/state/gemini-key-last-used"}
 
@@ -54,6 +55,7 @@ while [ "$#" -gt 0 ]; do
     --provider) [ "$#" -ge 2 ] || exit 2; PROVIDER=$2; shift 2 ;;
     --ssh-key) [ "$#" -ge 2 ] || exit 2; SSH_KEY_FILE=$2; shift 2 ;;
     --gemini-key) [ "$#" -ge 2 ] || exit 2; GEMINI_KEY_CHOICE=$2; shift 2 ;;
+    --clay-sandbox-mode) [ "$#" -ge 2 ] || exit 2; CLAY_SANDBOX_MODE=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     --) shift; break ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
@@ -98,6 +100,16 @@ case "$PROVIDER" in
   *) echo "unsupported provider: $PROVIDER" >&2; exit 2 ;;
 esac
 
+if [ -n "$CLAY_SANDBOX_MODE" ]; then
+  case "$CLAY_SANDBOX_MODE" in
+    sandbox|sandbox-auto|unleashed|unleashed-auto) ;;
+    *) echo "unsupported Clay sandbox mode: $CLAY_SANDBOX_MODE" >&2; exit 2 ;;
+  esac
+  CLAY_SANDBOX_ARGS="--setenv CLAY_SANDBOX_MODE $CLAY_SANDBOX_MODE"
+else
+  CLAY_SANDBOX_ARGS=""
+fi
+
 SECRET_DIR=$(mktemp -d /tmp/ai-guard-clay-secret.XXXXXX)
 trap 'rm -rf "$SECRET_DIR"' EXIT HUP INT TERM
 umask 077
@@ -116,7 +128,7 @@ case "$PROVIDER" in
     GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
     printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       $CLAY_SANDBOX_ARGS       -- "$@"
     ;;
 
   gemini)
