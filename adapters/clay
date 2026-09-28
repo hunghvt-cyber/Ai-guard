@@ -28,7 +28,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage:
   adapters/clay --worker PATH [--workspace PATH] [--network none|host]
-                 [--provider groq|gemini|custom]
+                 [--provider groq|gemini|cerebras|custom]
                  [--gemini-key N]
                  -- [clay-worker args...]
 
@@ -38,6 +38,7 @@ Provider configuration:
          CLAY_PROVIDER=custom
          CLAY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
          CUSTOM_MODEL=gemini-3.1-flash-lite
+  cerebras CEREBRAS_API_KEY / CEREBRAS_MODEL / optional CEREBRAS_BASE_URL
   custom CLAY_API_KEY / CLAY_BASE_URL / CUSTOM_MODEL
 EOF
 }
@@ -60,7 +61,7 @@ done
 [ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
 
 case "$PROVIDER" in
-  groq|gemini|custom) ;;
+  groq|gemini|cerebras|custom) ;;
   *) echo "unsupported provider: $PROVIDER" >&2; exit 2 ;;
 esac
 
@@ -164,6 +165,43 @@ case "$PROVIDER" in
     printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
 
     exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
+    ;;
+
+
+  cerebras)
+    CEREBRAS_SECRET_ENV=${CLAY_CEREBRAS_SECRET_ENV:-"$HOME/.config/clay/cerebras.env"}
+    if [ -z "${CEREBRAS_API_KEY:-}" ] && [ -r "$CEREBRAS_SECRET_ENV" ]; then
+      CEREBRAS_API_KEY=$(sed -n 's/^CEREBRAS_API_KEY=//p' "$CEREBRAS_SECRET_ENV" | head -n 1)
+      [ -n "$CEREBRAS_API_KEY" ] && export CEREBRAS_API_KEY
+    fi
+    if [ -z "${CEREBRAS_MODEL:-}" ] && [ -r "$CEREBRAS_SECRET_ENV" ]; then
+      CEREBRAS_MODEL=$(sed -n 's/^CEREBRAS_MODEL=//p' "$CEREBRAS_SECRET_ENV" | head -n 1)
+      [ -n "$CEREBRAS_MODEL" ] && export CEREBRAS_MODEL
+    fi
+    if [ -z "${CEREBRAS_BASE_URL:-}" ] && [ -r "$CEREBRAS_SECRET_ENV" ]; then
+      CEREBRAS_BASE_URL=$(sed -n 's/^CEREBRAS_BASE_URL=//p' "$CEREBRAS_SECRET_ENV" | head -n 1)
+      [ -n "$CEREBRAS_BASE_URL" ] && export CEREBRAS_BASE_URL
+    fi
+
+    [ -n "${CEREBRAS_API_KEY:-}" ] || {
+      echo "CEREBRAS_API_KEY is required" >&2
+      echo "Set it in $CEREBRAS_SECRET_ENV or the environment." >&2
+      exit 2
+    }
+    CEREBRAS_MODEL=${CEREBRAS_MODEL:-gpt-oss-120b}
+    CEREBRAS_BASE_URL=${CEREBRAS_BASE_URL:-https://api.cerebras.ai/v1}
+
+    printf '%s' "$CEREBRAS_API_KEY" > "$SECRET_DIR/CEREBRAS_API_KEY"
+
+    exec "$BASE/bin/ai-guard" \
+      --workspace "$WORKSPACE" \
+      --network "$NETWORK" \
+      --program "$WORKER" \
+      --secret-env CEREBRAS_API_KEY "$SECRET_DIR/CEREBRAS_API_KEY" \
+      --setenv CLAY_PROVIDER custom \
+      --setenv CLAY_BASE_URL "$CEREBRAS_BASE_URL" \
+      --setenv CUSTOM_MODEL "$CEREBRAS_MODEL" \
+      -- "$@"
     ;;
 
   custom)
