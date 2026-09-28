@@ -12,7 +12,7 @@ deny() {
 
 # Fail closed on shell composition, privilege escalation, and dangerous find/git forms.
 case "$cmd" in
-  *"|"*|*"&"*|*";"*|*">"*|*"<"*|*"`"*|*'\$('*|*"sudo "*|sudo|*"su "*|su|*"doas "*|doas)
+  *"|"*|*"&"*|*";"*|*">"*|*"<"*|'*`*'|'*$(*'|*"sudo "*|sudo|*"su "*|su|*"doas "*|doas)
     deny ;;
   *" -exec "*|*" -execdir "*|*" -delete "*|*" xargs "*|*"git -C "*' config '*|*"git -C "*' reset '*|*"git -C "*' clean '*|*"git -C "*' checkout '*|*"git -C "*' switch '*|*"git -C "*' restore '*|*"git -C "*' worktree '*)
     deny ;;
