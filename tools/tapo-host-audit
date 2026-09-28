@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+echo "===== TAPO HOST AUDIT / FIXED CAPABILITY ====="
+echo "TARGET_HOST=$(hostname)"
+echo "TARGET_ID=$(id)"
+echo "TARGET_KERNEL=$(uname -a)"
+
+echo "===== REPO ====="
+git -C /vol1/Docker/tapo-nas-lab branch --show-current
+git -C /vol1/Docker/tapo-nas-lab status --short
+git -C /vol1/Docker/tapo-nas-lab rev-parse HEAD
+
+echo "===== RECORDER ====="
+systemctl is-active tapo-recorder-cam1 || true
+systemctl is-active tapo-recorder-cam2 || true
+
+echo "===== EVENT LOGGER ====="
+docker ps --filter name=tapo-event-cam1 --filter name=tapo-event-cam2 --format "{{.Names}} {{.Status}}"
+
+echo "===== EVENT DATA ====="
+for f in /vol1/Docker/tapo-nas-lab/events/cam1-events.jsonl /vol1/Docker/tapo-nas-lab/events/cam2-events.jsonl; do
+  if [ -f "$f" ]; then
+    echo "--- $f"
+    wc -l "$f"
+    tail -3 "$f"
+  fi
+done
+
+echo "===== ARCHIVE ====="
+rclone listremotes 2>/dev/null || true
+
+echo "===== RETENTION CANDIDATES ====="
+find /recordings/cam1 /recordings/cam2 -type f -name "*.mp4" -mtime +7 -printf "%p %s %TY-%Tm-%Td %TH:%TM:%TS
+" 2>/dev/null | sort | head -200 || true
+
+echo "===== END ====="
