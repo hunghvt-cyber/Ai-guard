@@ -23,7 +23,7 @@ echo "== non-secret environment =="
 "$BASE/bin/ai-guard" --workspace "$W" --program /bin/sh --setenv CLAY_PROVIDER groq --setenv GROQ_MODEL test-model -- -c 'test "$CLAY_PROVIDER" = groq; test "$GROQ_MODEL" = test-model'
 echo PASS
 echo "== filesystem =="
-guard /bin/sh -c 'test -f /workspace/input; touch /workspace/write-ok; test -f /workspace/write-ok; ! touch /etc/ai-guard-write-test 2>/dev/null; ! test -e /vol1; ! test -e /home/admin/.ssh; ! test -e /root/.ssh'
+guard /bin/sh -c 'test -f /workspace/input; touch /workspace/write-ok; test -f /workspace/write-ok; ! touch /etc/ai-guard-write-test 2>/dev/null; test -d /vol1; test -r /vol1/Docker; test -r /vol1/Docker/Ai-guard; ! touch /vol1/Docker/Ai-guard/.ai-guard-readonly-test 2>/dev/null; ! mkdir /vol1/Docker/Ai-guard/.ai-guard-readonly-test-dir 2>/dev/null; ! rm -f /vol1/Docker/Ai-guard/.ai-guard-readonly-test 2>/dev/null; ! test -e /home/admin/.ssh; ! test -e /root/.ssh'
 echo PASS
 
 echo "== workspace guard =="
