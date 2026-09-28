@@ -8,6 +8,7 @@ BASE=$(readlink -f "$BASE")
 # GROQ_API_KEY is not already present in the environment. The key is
 # never printed, placed in argv, or copied into the workspace.
 CLAY_SECRET_ENV=${CLAY_SECRET_ENV:-"$HOME/.config/clay/groq.env"}
+CLAY_OPENROUTER_SECRET_ENV=${CLAY_OPENROUTER_SECRET_ENV:-"$HOME/.config/clay/openrouter.env"}
 if [ -z "${GROQ_API_KEY:-}" ] && [ -r "$CLAY_SECRET_ENV" ]; then
   GROQ_API_KEY=$(sed -n 's/^GROQ_API_KEY=//p' "$CLAY_SECRET_ENV" | head -n 1)
   [ -n "$GROQ_API_KEY" ] && export GROQ_API_KEY
@@ -44,6 +45,8 @@ Provider configuration:
          CLAY_PROVIDER=custom
          CLAY_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
          CUSTOM_MODEL=gemini-3.1-flash-lite
+  openrouter OPENROUTER_API_KEY / OPENROUTER_MODEL / optional OPENROUTER_BASE_URL
+            secret file: CLAY_OPENROUTER_SECRET_ENV (default ~/.config/clay/openrouter.env)
   custom CLAY_API_KEY / CLAY_BASE_URL / CUSTOM_MODEL
 EOF
 }
@@ -97,7 +100,7 @@ if [ -n "$SSH_KEY_FILE" ]; then
 fi
 
 case "$PROVIDER" in
-  groq|gemini|custom) ;;
+  groq|gemini|openrouter|custom) ;;
   *) echo "unsupported provider: $PROVIDER" >&2; exit 2 ;;
 esac
 
@@ -219,6 +222,22 @@ case "$PROVIDER" in
     exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       $CLAY_SANDBOX_ARGS       -- "$@"
     ;;
 
+  openrouter)
+    if [ -z "${OPENROUTER_API_KEY:-}" ] && [ -r "$CLAY_OPENROUTER_SECRET_ENV" ]; then
+      OPENROUTER_API_KEY=$(sed -n 's/^OPENROUTER_API_KEY=//p' "$CLAY_OPENROUTER_SECRET_ENV" | head -n 1)
+      [ -n "$OPENROUTER_API_KEY" ] && export OPENROUTER_API_KEY
+    fi
+    if [ -z "${OPENROUTER_MODEL:-}" ] && [ -r "$CLAY_OPENROUTER_SECRET_ENV" ]; then
+      OPENROUTER_MODEL=$(sed -n 's/^OPENROUTER_MODEL=//p' "$CLAY_OPENROUTER_SECRET_ENV" | head -n 1)
+      [ -n "$OPENROUTER_MODEL" ] && export OPENROUTER_MODEL
+    fi
+    [ -n "${OPENROUTER_API_KEY:-}" ] || { echo "OPENROUTER_API_KEY is required" >&2; exit 2; }
+    OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-oss-120b:free}
+    OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+    printf "%s" "$OPENROUTER_API_KEY" > "$SECRET_DIR/CLAY_API_KEY"
+
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL "$OPENROUTER_BASE_URL"       --setenv CUSTOM_MODEL "$OPENROUTER_MODEL"       $SSH_KEY_ARGS       ${SSH_KEY_FILE:+--setenv CLAY_SSH_KEY_PATH /run/secrets/CLAY_SSH_KEY}       $CLAY_SANDBOX_ARGS       -- "$@"
+    ;;
   custom)
     [ -n "${CLAY_API_KEY:-}" ] || { echo "CLAY_API_KEY is required for custom provider" >&2; exit 2; }
     [ -n "${CLAY_BASE_URL:-}" ] || { echo "CLAY_BASE_URL is required for custom provider" >&2; exit 2; }
