@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+cmd=${SSH_ORIGINAL_COMMAND:-}
+
+deny() {
+  echo "AI Guard SSH policy: DENIED" >&2
+  exit 126
+}
+
+[ -n "$cmd" ] || deny
+
+# Never allow shell composition, redirection, command substitution, or privilege escalation.
+case "$cmd" in
+  *"|"*|*"&"*|*";"*|*">"*|*"<"*|*"sudo "*|sudo|*"su "*|su|*"doas "*|doas)
+    deny ;;
+esac
+
+# Explicitly deny destructive/admin operations.
+case "$cmd" in
+  rm|rm\ *|mv\ *|cp\ *|chmod\ *|chown\ *|kill\ *|pkill\ *|reboot|shutdown|poweroff|systemctl\ restart\ *|systemctl\ stop\ *|systemctl\ disable\ *|systemctl\ mask\ *|docker\ rm\ *|docker\ stop\ *|docker\ kill\ *|docker\ exec\ *|docker\ compose\ *|rclone\ copy\ *|rclone\ move\ *|rclone\ delete\ *|rclone\ purge\ *)
+    deny ;;
+esac
+
+# Read-only Tapo/host inspection commands.
+case "$cmd" in
+  hostname|id|uname|uname\ *)
+    exec /bin/sh -c "$cmd" ;;
+  find\ /recordings|find\ /recordings\ *)
+    exec /bin/sh -c "$cmd" ;;
+  ls\ /recordings|ls\ -l\ /recordings|ls\ -la\ /recordings|ls\ -lh\ /recordings|ls\ /recordings/*|ls\ -l\ /recordings/*|ls\ -lh\ /recordings/*)
+    exec /bin/sh -c "$cmd" ;;
+  wc\ */recordings/*|stat\ */recordings/*|du\ */recordings/*)
+    exec /bin/sh -c "$cmd" ;;
+  tail\ */vol1/Docker/tapo-nas-lab/events/*|wc\ */vol1/Docker/tapo-nas-lab/events/*|grep\ */vol1/Docker/tapo-nas-lab/events/*)
+    exec /bin/sh -c "$cmd" ;;
+  git\ -C\ /vol1/Docker/tapo-nas-lab\ *)
+    exec /bin/sh -c "$cmd" ;;
+  systemctl\ is-active\ *|systemctl\ status\ *|docker\ ps|docker\ ps\ *|rclone\ listremotes|rclone\ lsf\ *)
+    exec /bin/sh -c "$cmd" ;;
+esac
+
+deny
