@@ -23,7 +23,8 @@ AI Guard is agent-agnostic: adapters select the CLI, while the Guard owns the OS
 - only the supplied workspace is writable on the host
 - the workspace cannot overlap the Guard installation or protected host roots
 - `/home`, `/root`, and `/tmp` are sandbox-local
-- `/vol1` is not mounted
+- `/vol1` is mounted read-only when `EXPOSE_VOL1=1` (the default on the FnNAS read-only branch)
+- `/vol1` host permissions are not changed
 - Docker/containerd sockets are not mounted
 - SSH credentials are not mounted
 - PID, IPC and UTS namespaces are isolated
