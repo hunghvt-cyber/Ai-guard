@@ -18,11 +18,16 @@ done
 [[ -d "$WORKSPACE" && -f "$POLICY" && $# -gt 0 ]] || { echo "invalid workspace, policy, or command" >&2; exit 2; }
 source "$POLICY"
 [[ "$WORKSPACE_MODE" == rw ]] || { echo "WORKSPACE_MODE must be rw" >&2; exit 2; }
-[[ "$EXPOSE_SSH" == 0 && "$EXPOSE_DOCKER" == 0 && "$EXPOSE_VOL1" == 0 ]] || { echo "sensitive-path exposure is disabled" >&2; exit 2; }
+[[ "$EXPOSE_SSH" == 0 && "$EXPOSE_DOCKER" == 0 ]] || { echo "SSH/Docker exposure is disabled" >&2; exit 2; }
+[[ "$EXPOSE_VOL1" == 0 || "$EXPOSE_VOL1" == 1 ]] || { echo "EXPOSE_VOL1 must be 0 or 1" >&2; exit 2; }
 B=(bwrap --ro-bind /usr /usr --ro-bind /bin /bin)
 [[ -d /lib ]] && B+=(--ro-bind /lib /lib)
 [[ -d /lib64 ]] && B+=(--ro-bind /lib64 /lib64)
 B+=(--ro-bind /etc /etc --proc /proc --dev /dev --tmpfs /tmp --tmpfs /home --tmpfs /root --dir /home/sandbox --bind "$WORKSPACE" /workspace --chdir /workspace --cap-drop ALL --new-session)
+if [[ "$EXPOSE_VOL1" == 1 ]]; then
+ [[ -d /vol1 ]] || { echo "/vol1 is not available" >&2; exit 2; }
+ B+=(--ro-bind /vol1 /vol1)
+fi
 if [[ -n "$PROGRAM_STAGE" ]]; then
  [[ -d "$PROGRAM_STAGE" ]] || { echo "program staging directory missing" >&2; exit 2; }
  B+=(--ro-bind "$PROGRAM_STAGE" /opt/ai-guard)
