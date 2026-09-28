@@ -10,26 +10,26 @@ deny() {
 
 [ -n "$cmd" ] || deny
 
-# No shell composition, redirection, or privilege escalation.
+# Fail closed on shell composition, privilege escalation, and dangerous find/git forms.
 case "$cmd" in
-  *"|"*|*"&"*|*";"*|*">"*|*"<"*|*"sudo "*|sudo|*"su "*|su|*"doas "*|doas)
+  *"|"*|*"&"*|*";"*|*">"*|*"<"*|*"`"*|*'\$('*|*"sudo "*|sudo|*"su "*|su|*"doas "*|doas)
+    deny ;;
+  *" -exec "*|*" -execdir "*|*" -delete "*|*" xargs "*|*"git -C "*' config '*|*"git -C "*' reset '*|*"git -C "*' clean '*|*"git -C "*' checkout '*|*"git -C "*' switch '*|*"git -C "*' restore '*|*"git -C "*' worktree '*)
     deny ;;
 esac
 
-# Destructive/admin operations are denied.
 case "$cmd" in
   rm|rm\ *|mv\ *|cp\ *|chmod\ *|chown\ *|kill\ *|pkill\ *|reboot|shutdown|poweroff|systemctl\ restart\ *|systemctl\ stop\ *|systemctl\ disable\ *|systemctl\ mask\ *|docker\ rm\ *|docker\ stop\ *|docker\ kill\ *|docker\ exec\ *|docker\ compose\ *|rclone\ copy\ *|rclone\ move\ *|rclone\ delete\ *|rclone\ purge\ *)
     deny ;;
 esac
 
-# Read-only host/Tapo inspection.
 case "$cmd" in
   hostname|id|uname|uname\ *) exec /bin/sh -c "$cmd" ;;
   find\ /recordings|find\ /recordings\ *) exec /bin/sh -c "$cmd" ;;
   ls\ /recordings|ls\ -l\ /recordings|ls\ -la\ /recordings|ls\ -lh\ /recordings|ls\ /recordings/*|ls\ -l\ /recordings/*|ls\ -lh\ /recordings/*) exec /bin/sh -c "$cmd" ;;
   wc\ */recordings/*|stat\ */recordings/*|du\ */recordings/*) exec /bin/sh -c "$cmd" ;;
   tail\ */vol1/Docker/tapo-nas-lab/events/*|wc\ */vol1/Docker/tapo-nas-lab/events/*|grep\ */vol1/Docker/tapo-nas-lab/events/*) exec /bin/sh -c "$cmd" ;;
-  git\ -C\ /vol1/Docker/tapo-nas-lab\ *) exec /bin/sh -c "$cmd" ;;
+  git\ -C\ /vol1/Docker/tapo-nas-lab\ branch\ --show-current|git\ -C\ /vol1/Docker/tapo-nas-lab\ status\ --short|git\ -C\ /vol1/Docker/tapo-nas-lab\ rev-parse\ HEAD|git\ -C\ /vol1/Docker/tapo-nas-lab\ log\ *) exec /bin/sh -c "$cmd" ;;
   systemctl\ is-active\ *|systemctl\ status\ *|docker\ ps|docker\ ps\ *|rclone\ listremotes|rclone\ lsf\ *) exec /bin/sh -c "$cmd" ;;
 esac
 
