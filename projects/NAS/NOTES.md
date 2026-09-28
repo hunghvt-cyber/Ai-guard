@@ -53,3 +53,32 @@ Rules:
 - GitHub remains the durable source of truth; Clay is an execution consumer.
 - The host's GitHub SSH authentication is outside the Clay sandbox and is not exposed to Clay as a credential.
 - Verified on 2026-09-28: FnNAS can successfully fetch `origin/main` from `github.com` for `hunghvt-cyber/tapo-nas-lab`.
+
+
+## Clay SSH to FnNAS — verified
+
+**Verified: 2026-09-28**
+
+The dedicated Clay SSH identity is proven against the real FnNAS host:
+
+- SSH user: `clay`
+- Host: `100.94.158.94`
+- Private key source: `/home/clay/.ssh/id_ed25519` on the invoking admin environment
+- Injection: AI Guard `--secret-file CLAY_SSH_KEY`
+- Runtime path: `/run/secrets/CLAY_SSH_KEY`
+- Environment path: `CLAY_SSH_KEY_PATH=/run/secrets/CLAY_SSH_KEY`
+- Network: explicit `--network host`
+- Clay mode used for proof: `unleashed-auto`
+- Result: `CLAY_ADMIN_HOST_OK`
+
+The same dedicated key was tested against `admin@100.94.158.94` and was rejected with `Permission denied (publickey,password)`. This confirms the intended authorization is the dedicated `clay` account, not `admin`.
+
+Do not weaken this model by installing the Clay public key into the admin account. Host operations requiring elevated privileges should use the existing `clay` account sudo policy and remain constrained by the explicit task and AI Guard boundary.
+
+For the Tapo workflow, the target is now:
+
+```
+clay@100.94.158.94
+```
+
+The Tapo task file on GitHub main has been aligned with this target. Clay remains a read/execute consumer and must not gain GitHub write capability.
