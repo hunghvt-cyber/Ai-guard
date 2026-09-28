@@ -24,3 +24,32 @@
 ## AI access principle
 
 The fact that an AI can reach the host does not mean it may modify it. Access path and authorization scope are separate concerns.
+
+
+## Clay task retrieval from GitHub
+
+The Clay/Tapo operational workflow uses the FnNAS host's existing authenticated Git SSH access instead of giving Clay GitHub credentials.
+
+Flow:
+
+```
+GitHub main / tasks/current.md
+  ↓
+FnNAS: git fetch origin main
+  ↓
+git show origin/main:tasks/current.md
+  ↓
+Clay reads the task through its established host SSH path
+  ↓
+Clay executes only the explicitly listed commands
+```
+
+Rules:
+
+- Do not add `gh`, GitHub API credentials, or GitHub write capability to Clay for this workflow.
+- Do not fetch a private repository's `raw.githubusercontent.com` URL directly from Clay; unauthenticated access returns 404.
+- Do not use `git pull` on the Tapo working tree just to retrieve a task, because the checkout may be on a non-main branch and must not be disturbed.
+- Prefer `git fetch origin main` + `git show origin/main:tasks/current.md`.
+- GitHub remains the durable source of truth; Clay is an execution consumer.
+- The host's GitHub SSH authentication is outside the Clay sandbox and is not exposed to Clay as a credential.
+- Verified on 2026-09-28: FnNAS can successfully fetch `origin/main` from `github.com` for `hunghvt-cyber/tapo-nas-lab`.
