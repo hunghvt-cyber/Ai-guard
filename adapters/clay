@@ -56,6 +56,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ "$#" -gt 0 ] || { echo "no clay-worker arguments supplied" >&2; exit 2; }
+
+# Give Clay a minimal persistent config inside the writable workspace.
+mkdir -p "$WORKSPACE/.clay"
+printf '%s\n' '{"sandbox_readonly_mounts":["/vol1"]}' > "$WORKSPACE/.clay/config.json"
+chmod 600 "$WORKSPACE/.clay/config.json"
 [ -n "$WORKER" ] || { echo "set --worker PATH or CLAY_WORKER" >&2; exit 2; }
 [ -x "$WORKER" ] || { echo "clay-worker is not executable: $WORKER" >&2; exit 2; }
 
@@ -76,7 +81,7 @@ case "$PROVIDER" in
     GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
     printf '%s' "$GROQ_API_KEY" > "$SECRET_DIR/GROQ_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env GROQ_API_KEY "$SECRET_DIR/GROQ_API_KEY"       --setenv HOME /workspace       --setenv CLAY_PROVIDER groq       --setenv GROQ_MODEL "$GROQ_MODEL"       ${GROQ_BASE_URL:+--setenv GROQ_BASE_URL "$GROQ_BASE_URL"}       -- "$@"
     ;;
 
   gemini)
@@ -163,7 +168,7 @@ case "$PROVIDER" in
 
     printf '%s' "$SELECTED_SECRET" > "$SECRET_DIR/CLAY_API_KEY"
 
-    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
+    exec "$BASE/bin/ai-guard"       --workspace "$WORKSPACE"       --network "$NETWORK"       --program "$WORKER"       --secret-env CLAY_API_KEY "$SECRET_DIR/CLAY_API_KEY"       --setenv HOME /workspace       --setenv CLAY_PROVIDER custom       --setenv CLAY_BASE_URL https://generativelanguage.googleapis.com/v1beta/openai       --setenv CUSTOM_MODEL "${GEMINI_MODEL:-gemini-3.1-flash-lite}"       -- "$@"
     ;;
 
   custom)
