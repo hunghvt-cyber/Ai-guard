@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+SSH_KEY=""
+TARGET="clay@100.94.158.94"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --ssh-key) SSH_KEY=$2; shift 2 ;;
+    --target) TARGET=$2; shift 2 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$SSH_KEY" ] || { echo "SSH key required" >&2; exit 2; }
+[ -r "$SSH_KEY" ] || { echo "SSH key is not readable" >&2; exit 2; }
+
+exec ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=8 "$TARGET" /usr/local/libexec/tapo-host-audit
